@@ -1,0 +1,50 @@
+import { NextResponse } from 'next/server';
+import { query } from '@/lib/mysql';
+
+export async function GET(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const email = searchParams.get('email');
+    if (!email) return NextResponse.json({ error: 'Email required' }, { status: 400 });
+
+    // Find personne by email
+    const personnes: any = await query('SELECT * FROM Personne WHERE email = ?', [email]);
+    if (!personnes || (personnes as any[]).length === 0) return NextResponse.json(null);
+    const personne = (personnes as any[])[0];
+
+    // Try to find employe
+    const employes: any = await query('SELECT * FROM Employe WHERE id_personne = ?', [personne.id_personne]);
+    if (employes && (employes as any[]).length > 0) {
+      const employe = (employes as any[])[0];
+      const roles: any = await query('SELECT * FROM Role WHERE id_role = ?', [employe.id_role]);
+      const role = (roles && (roles as any[]).length > 0) ? roles[0] : null;
+      return NextResponse.json({
+        uid: employe.id_employe,
+        personneId: personne.id_personne,
+        email: personne.email,
+        displayName: `${personne.prenom} ${personne.nom}`,
+        photoURL: null,
+        role: role ? role.libelle : 'client'
+      });
+    }
+
+    // Try client
+    const clients: any = await query('SELECT * FROM Client WHERE id_personne = ?', [personne.id_personne]);
+    if (clients && (clients as any[]).length > 0) {
+      const client = (clients as any[])[0];
+      return NextResponse.json({
+        uid: client.id_client,
+        personneId: personne.id_personne,
+        email: personne.email,
+        displayName: `${personne.prenom} ${personne.nom}`,
+        photoURL: null,
+        role: 'client'
+      });
+    }
+
+    return NextResponse.json(null);
+  } catch (err) {
+    console.error(err);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
+  }
+}

@@ -1,0 +1,84 @@
+
+{
+  "database": {
+    "Personne": [
+      { "id_personne": "p1", "nom": "Admin", "prenom": "User", "email": "admin@agileflow.com", "telephone": "0102030405", "created_at": "2024-01-01T10:00:00.000Z", "updated_at": "2024-01-01T10:00:00.000Z" },
+      { "id_personne": "p2", "nom": "Manager", "prenom": "User", "email": "manager@agileflow.com", "telephone": "0102030406", "created_at": "2024-01-01T10:00:00.000Z", "updated_at": "2024-01-01T10:00:00.000Z" },
+      { "id_personne": "p3", "nom": "Sales", "prenom": "User", "email": "sales@agileflow.com", "telephone": "0102030407", "created_at": "2024-01-01T10:00:00.000Z", "updated_at": "2024-01-01T10:00:00.000Z" },
+      { "id_personne": "p4", "nom": "Support", "prenom": "User", "email": "support@agileflow.com", "telephone": "0102030408", "created_at": "2024-01-01T10:00:00.000Z", "updated_at": "2024-01-01T10:00:00.000Z" },
+      { "id_personne": "p5", "nom": "Alpha", "prenom": "Société", "email": "client@alpha.com", "telephone": "0601010101", "created_at": "2024-01-10T10:00:00.000Z", "updated_at": "2024-01-10T10:00:00.000Z" },
+      { "id_personne": "p6", "nom": "Beta", "prenom": "Global", "email": "client@beta.com", "telephone": "0602020202", "created_at": "2024-01-11T10:00:00.000Z", "updated_at": "2024-01-11T10:00:00.000Z" }
+    ],
+    "Role": [
+      { "id_role": "r1", "libelle": "admin" },
+      { "id_role": "r2", "libelle": "manager" },
+      { "id_role": "r3", "libelle": "sales" },
+      { "id_role": "r4", "libelle": "support" },
+      { "id_role": "r5", "libelle": "client" }
+    ],
+    "Employe": [
+      { "id_employe": "e1", "id_personne": "p1", "id_role": "r1", "mot_de_passe": "password", "statut": "Actif", "date_embauche": "2022-08-15T00:00:00.000Z" },
+      { "id_employe": "e2", "id_personne": "p2", "id_role": "r2", "mot_de_passe": "password", "statut": "Actif", "date_embauche": "2023-03-10T00:00:00.000Z" },
+      { "id_employe": "e3", "id_personne": "p3", "id_role": "r3", "mot_de_passe": "password", "statut": "Actif", "date_embauche": "2023-06-01T00:00:00.000Z" },
+      { "id_employe": "e4", "id_personne": "p4", "id_role": "r4", "mot_de_passe": "password", "statut": "Actif", "date_embauche": "2023-09-20T00:00:00.000Z" }
+    ],
+    "Client": [
+      { "id_client": "c1", "id_personne": "p5", "statut": "Actif" },
+      { "id_client": "c2", "id_personne": "p6", "statut": "Prospect" }
+    ],
+    "Produit": [
+      { "id_produit": "prod_premium", "nom": "Abonnement Premium", "description": "Accès complet à la plateforme", "prix": 99.99 },
+      { "id_produit": "prod_standard", "nom": "Abonnement Standard", "description": "Accès limité", "prix": 49.99 }
+    ],
+    "Opportunite": [
+      { "id_opportunite": "opp_alpha", "titre": "Intégration CRM pour Alpha", "valeur": 5000, "etape": "Proposition", "date_creation": "2024-05-01T11:00:00.000Z", "id_employe": "e3", "id_client": "c1", "updated_at": "2024-05-01T11:00:00.000Z" },
+      { "id_opportunite": "opp_beta", "titre": "Phase de découverte Beta", "valeur": 10000, "etape": "Qualification", "date_creation": "2024-04-25T16:00:00.000Z", "id_employe": "e3", "id_client": "c2", "updated_at": "2024-04-25T16:00:00.000Z" }
+    ],
+    "Type_Interaction": [
+      { "id_type": "type_appel", "libelle": "Appel" },
+      { "id_type": "type_email", "libelle": "Email" },
+      { "id_type": "type_reunion", "libelle": "Réunion" },
+      { "id_type": "type_note", "libelle": "Note" }
+    ],
+    "Objectif": [
+      { "id_objectif": "obj_suivi", "libelle": "Suivi" },
+      { "id_objectif": "obj_demo", "libelle": "Démonstration" }
+    ],
+    "Interaction": [
+      { "id_interaction": "int_1", "date_interaction": "2024-05-15T09:00:00.000Z", "id_employe": "e3", "id_client": "c1", "id_objectif": "obj_suivi", "id_type": "type_email", "resultat": "Email de suivi envoyé concernant la proposition."},
+      { "id_interaction": "int_2", "date_interaction": "2024-05-14T15:30:00.000Z", "id_employe": "e3", "id_client": "c2", "id_objectif": "obj_demo", "id_type": "type_reunion", "resultat": "Réunion de démonstration effectuée. Le client semble intéressé."},
+      { "id_interaction": "int_3", "date_interaction": "2024-05-16T11:00:00.000Z", "id_employe": "e4", "id_client": "c1", "id_objectif": "obj_suivi", "id_type": "type_email", "resultat": "Problème de connexion résolu."},
+      { "id_interaction": "int_4", "date_interaction": "2024-05-17T14:00:00.000Z", "id_employe": "e3", "id_client": "c1", "id_objectif": "obj_suivi", "id_type": "type_note", "resultat": "Le client a confirmé la réception de la proposition."}
+    ],
+    "Task": [
+      { "id_task": "task_1", "titre": "Préparer la proposition pour Alpha", "type": "Professionnel", "statut": "En Cours", "priorite": "Haute", "date_creation": "2024-05-10T10:00:00.000Z", "date_echeance": "2024-05-25T17:00:00.000Z", "id_createur": "e2", "id_assigner_a": "e3", "id_client": "c1", "updated_at": "2024-05-10T10:00:00.000Z" },
+      { "id_task": "task_2", "titre": "Planifier la démo avec Beta", "type": "Professionnel", "statut": "Ouverte", "priorite": "Moyenne", "date_creation": "2024-05-12T10:00:00.000Z", "date_echeance": "2024-05-20T17:00:00.000Z", "id_createur": "e2", "id_assigner_a": "e3", "id_client": "c2", "updated_at": "2024-05-12T10:00:00.000Z" },
+      { "id_task": "task_3", "titre": "Valider nouvelle stratégie marketing", "type": "Professionnel", "statut": "PendingValidation", "priorite": "Haute", "date_creation": "2024-05-13T10:00:00.000Z", "date_echeance": "2024-05-30T17:00:00.000Z", "id_createur": "e2", "id_assigner_a": "e1", "id_client": null, "updated_at": "2024-05-13T10:00:00.000Z" },
+      { "id_task": "task_4", "titre": "Formation interne CRM", "type": "Personnel", "statut": "Ouverte", "priorite": "Moyenne", "date_creation": "2024-05-18T10:00:00.000Z", "date_echeance": "2024-05-28T17:00:00.000Z", "id_createur": "e3", "id_assigner_a": "e3", "id_client": null, "updated_at": "2024-05-18T10:00:00.000Z" },
+      { "id_task": "task_5", "titre": "Rapport de performance mensuel", "type": "Professionnel", "statut": "Ouverte", "priorite": "Basse", "date_creation": "2024-05-20T10:00:00.000Z", "date_echeance": "2024-06-05T17:00:00.000Z", "id_createur": "e1", "id_assigner_a": "e2", "id_client": null, "updated_at": "2024-05-20T10:00:00.000Z" },
+      { "id_task": "task_6", "titre": "Organiser le team building", "type": "Personnel", "statut": "En Cours", "priorite": "Moyenne", "date_creation": "2024-05-21T10:00:00.000Z", "date_echeance": "2024-06-15T17:00:00.000Z", "id_createur": "e2", "id_assigner_a": "e2", "id_client": null, "updated_at": "2024-05-21T10:00:00.000Z" }
+    ],
+    "Conversation": [
+      { "id_conversation": "conv_1", "titre": "Discussion Projet Alpha", "id_createur": "e3", "date_creation": "2024-05-15T14:50:00.000Z", "updated_at": "2024-05-15T15:00:00.000Z" },
+      { "id_conversation": "conv_2", "titre": "Question Client Beta", "id_createur": "e4", "date_creation": "2024-05-15T11:45:00.000Z", "updated_at": "2024-05-15T12:00:00.000Z" },
+      { "id_conversation": "conv_3", "titre": "Briefing Équipe Commerciale", "id_createur": "e2", "date_creation": "2024-05-20T09:00:00.000Z", "updated_at": "2024-05-20T09:15:00.000Z", "isBanned": false }
+    ],
+    "Participant": [
+      { "id_conversation": "conv_1", "id_personne": "p3", "type_participant": "Employe", "date_ajout": "2024-05-15T14:50:00.000Z" },
+      { "id_conversation": "conv_1", "id_personne": "p4", "type_participant": "Employe", "date_ajout": "2024-05-15T14:50:00.000Z" },
+      { "id_conversation": "conv_2", "id_personne": "p4", "type_participant": "Employe", "date_ajout": "2024-05-15T11:45:00.000Z" },
+      { "id_conversation": "conv_2", "id_personne": "p6", "type_participant": "Client", "date_ajout": "2024-05-15T11:45:00.000Z" },
+      { "id_conversation": "conv_3", "id_personne": "p2", "type_participant": "Employe", "date_ajout": "2024-05-20T09:00:00.000Z" },
+      { "id_conversation": "conv_3", "id_personne": "p3", "type_participant": "Employe", "date_ajout": "2024-05-20T09:00:00.000Z" }
+    ],
+    "Message": [
+      { "id_message": "msg_1_1", "contenu": "Salut, tu as pu jeter un oeil à la doc pour Alpha ?", "date_envoi": "2024-05-15T14:55:00.000Z", "id_emetteur": "p3", "id_conversation": "conv_1" },
+      { "id_message": "msg_1_2", "contenu": "Oui, j'ai une question sur le point 3. On peut faire un point demain ?", "date_envoi": "2024-05-15T15:00:00.000Z", "id_emetteur": "p4", "id_conversation": "conv_1" },
+      { "id_message": "msg_2_1", "contenu": "Bonjour, je ne comprends pas comment activer la nouvelle fonctionnalité.", "date_envoi": "2024-05-15T11:50:00.000Z", "id_emetteur": "p6", "id_conversation": "conv_2" },
+      { "id_message": "msg_2_2", "contenu": "Bonjour, il vous suffit d'aller dans les paramètres de votre compte. Je vous guide.", "date_envoi": "2024-05-15T11:55:00.000Z", "id_emetteur": "p4", "id_conversation": "conv_2" },
+      { "id_message": "msg_2_3", "contenu": "Merci pour votre retour rapide !", "date_envoi": "2024-05-15T12:00:00.000Z", "id_emetteur": "p6", "id_conversation": "conv_2" },
+      { "id_message": "msg_3_1", "contenu": "Bonjour l'équipe, petit point sur les objectifs du trimestre. Pensez à mettre à jour vos opportunités.", "date_envoi": "2024-05-20T09:10:00.000Z", "id_emetteur": "p2", "id_conversation": "conv_3"},
+      { "id_message": "msg_3_2", "contenu": "Bien reçu ! Je m'en occupe.", "date_envoi": "2024-05-20T09:15:00.000Z", "id_emetteur": "p3", "id_conversation": "conv_3"}
+    ]
+  }
+}
