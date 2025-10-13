@@ -32,6 +32,7 @@ import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/context/auth-context';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AddTaskDialog } from "@/components/add-task-dialog";
 
 
 // Types based on db.json structure
@@ -153,12 +154,17 @@ export default function TasksPage() {
   const isAdmin = user?.role === 'admin';
   const isManager = user?.role === 'manager';
 
-  const handleAddTask = () => {
-    // In a real app, this would open a dialog to create a task
-    toast({
-      title: 'Ajouter une Tâche',
-      description: 'La fonctionnalité pour créer une nouvelle tâche sera bientôt disponible.',
-    });
+  const handleTaskAdded = async () => {
+    // Refetch tasks when a new one is added
+    try {
+      const response = await fetch('/api/data/Task');
+      if (response.ok) {
+        const data = await response.json();
+        setTasksData(data);
+      }
+    } catch (error) {
+      console.error('Failed to refresh tasks:', error);
+    }
   };
   
   const handleStatusFilterChange = (status: string) => {
@@ -299,12 +305,7 @@ export default function TasksPage() {
           )}
 
           {canAddTask && (
-            <Button size="sm" className="h-8 gap-1" onClick={handleAddTask}>
-                <FilePlus2 className="h-3.5 w-3.5" />
-                <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
-                Ajouter une tâche
-                </span>
-            </Button>
+            <AddTaskDialog onTaskAdded={handleTaskAdded} />
           )}
          </div>
       </CardHeader>

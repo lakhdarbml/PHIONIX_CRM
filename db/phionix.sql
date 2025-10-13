@@ -1,0 +1,3 @@
+-- phionix database dump
+-- (moved from project root)
+-- If you need to restore: mysql -u user -p database < db/phionix.sql

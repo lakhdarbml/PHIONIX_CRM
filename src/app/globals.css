@@ -83,6 +83,32 @@ body {
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground;
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+  }
+}
+
+/* Layout helpers */
+@layer utilities {
+  .min-h-svh { min-height: 100svh; }
+  /* Ensure root elements fill the viewport so svh/min-h-svh works reliably */
+  html, body, #__next {
+    height: 100%;
+  }
+
+  /* Helper for full-height elements using svh in some browsers */
+  .h-svh { height: 100svh; }
+  .text-muted-foreground { color: hsl(var(--muted-foreground)); }
+  .font-headline { font-family: Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; }
+
+  /* Main layout adjustments: ensure sidebar + content are responsive */
+  .app-main {
+    display: flex;
+    min-height: 100svh;
+    gap: 1rem;
+  }
+
+  @media (max-width: 768px) {
+    .app-main { flex-direction: column; }
   }
 }

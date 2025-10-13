@@ -127,9 +127,12 @@ export function AppSidebar() {
   return (
     <Sidebar>
       <SidebarHeader>
-        <div className="flex items-center gap-2">
-            <PhoenixIcon className="w-6 h-6 text-primary" />
-            <h1 className="text-lg font-semibold font-headline">CRM AgileFlow</h1>
+        <div className="flex items-center gap-3 px-2 py-1">
+            <PhoenixIcon className="w-7 h-7 text-primary" />
+            <div className="flex flex-col">
+              <span className="text-base font-semibold leading-tight font-headline">PhionixCRM</span>
+              <span className="text-xs text-muted-foreground">Organisez vos ventes et interactions</span>
+            </div>
         </div>
       </SidebarHeader>
       <SidebarContent>
@@ -140,10 +143,11 @@ export function AppSidebar() {
                 asChild
                 isActive={isActive(item.href)}
                 tooltip={{ children: item.label, className:"font-headline" }}
+                className="px-3"
               >
-                <Link href={item.href}>
-                  <item.icon />
-                  <span>{item.label}</span>
+                <Link href={item.href} className="flex items-center gap-3">
+                  <item.icon className="text-sidebar-primary" />
+                  <span className="hidden md:inline-block">{item.label}</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>

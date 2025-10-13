@@ -24,7 +24,7 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className="font-body antialiased">
+      <body className="font-body antialiased min-h-screen flex flex-col h-full">
         <AuthProvider>
             {children}
         </AuthProvider>

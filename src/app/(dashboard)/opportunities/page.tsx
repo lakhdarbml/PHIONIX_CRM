@@ -31,6 +31,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAuth } from "@/context/auth-context";
+import { AddOpportunityDialog } from "@/components/add-opportunity-dialog";
 
 // Types based on db.json structure
 type Opportunite = {
@@ -227,12 +228,13 @@ export default function OpportunitiesPage() {
                   </DropdownMenuContent>
               </DropdownMenu>
               {isManagerOrAdmin && (
-                <Button size="sm" className="h-8 gap-1">
-                    <FilePlus2 className="h-3.5 w-3.5" />
-                    <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
-                    Ajouter une Opportunité
-                    </span>
-                </Button>
+                <AddOpportunityDialog onOpportunityAdded={() => {
+                  // Refetch opportunities when a new one is added
+                  fetch('/api/data/Opportunite')
+                    .then(res => res.ok && res.json())
+                    .then(data => setOpportunites(data))
+                    .catch(console.error);
+                }} />
               )}
               </div>
           )}

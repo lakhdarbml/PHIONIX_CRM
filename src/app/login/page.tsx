@@ -36,7 +36,7 @@ export default function LoginPage() {
     <div className="flex min-h-screen w-full items-center justify-center bg-background px-4">
       <Card className="mx-auto w-full max-w-sm">
         <CardHeader>
-          <CardTitle className="text-2xl font-headline">CRM AgileFlow</CardTitle>
+          <CardTitle className="text-2xl font-headline">PhionixCRM</CardTitle>
           <CardDescription>
             Enter your email below to login to your account
           </CardDescription>
@@ -49,7 +49,7 @@ export default function LoginPage() {
                 <Input
                   id="email"
                   type="email"
-                  placeholder="m@example.com"
+                  placeholder="m@phionixcrm.com"
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}

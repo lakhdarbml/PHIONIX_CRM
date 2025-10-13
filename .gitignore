@@ -16,6 +16,10 @@
 # next.js
 /.next/
 /out/
+dist/
+public/static
+tsconfig.tsbuildinfo
+.modified
 
 # production
 /build
@@ -40,6 +44,3 @@ next-env.d.ts
 .genkit/*
 .env*
 
-# firebase
-firebase-debug.log
-firestore-debug.log

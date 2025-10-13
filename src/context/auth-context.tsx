@@ -51,14 +51,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const bootstrap = async () => {
       try {
         const storedUserEmail = localStorage.getItem('user_email');
-        if (storedUserEmail) {
-          const res = await fetch(`/api/auth/findUser?email=${encodeURIComponent(storedUserEmail)}`);
-          if (res.ok) {
-            const data = await res.json();
-            setUser(data);
-          } else {
-            setUser(null);
-          }
+        const storedAuthenticated = localStorage.getItem('user_authenticated');
+        // Only bootstrap if the user explicitly authenticated previously.
+        if (storedUserEmail && storedAuthenticated === '1') {
+              const res = await fetch(`/api/auth/findUser?email=${encodeURIComponent(storedUserEmail)}`);
+              if (res.ok) {
+                const data = await res.json();
+                setUser(data);
+              } else {
+                // clear stored email if user not found or server error
+                localStorage.removeItem('user_email');
+                setUser(null);
+              }
         }
       } catch (e) {
         console.error('Could not bootstrap user from API', e);
@@ -79,22 +83,37 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [user, loading, pathname, router]);
 
   const signIn = async (email: string, pass: string) => {
-    // In a local setup, we bypass password check and find user by email via API
-    const res = await fetch(`/api/auth/findUser?email=${encodeURIComponent(email)}`);
-    if (!res.ok) throw new Error('User not found.');
-    const foundUser = await res.json();
-    if (foundUser) {
-      setUser(foundUser);
-      localStorage.setItem('user_email', foundUser.email!);
-      router.push('/');
-    } else {
-      throw new Error('User not found.');
+    // Call server-side login route which validates email+password
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password: pass }),
+    });
+    if (res.status === 401) {
+      const body = await res.json().catch(() => ({ error: 'Invalid credentials' }));
+      throw new Error(body.error || 'Invalid email or password');
     }
+    if (res.status === 400) {
+      const body = await res.json().catch(() => ({ error: 'Bad request' }));
+      throw new Error(body.error || 'Email and password required');
+    }
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Login failed' }));
+      throw new Error(err.error || 'Login failed');
+    }
+    const foundUser = await res.json();
+    if (!foundUser) throw new Error('User not found');
+    setUser(foundUser);
+    localStorage.setItem('user_email', foundUser.email || email);
+    // mark that the user successfully authenticated so bootstrap can restore session
+    localStorage.setItem('user_authenticated', '1');
+    router.push('/');
   };
 
   const signOut = async () => {
     setUser(null);
     localStorage.removeItem('user_email');
+    localStorage.removeItem('user_authenticated');
     router.push('/login');
   };
 

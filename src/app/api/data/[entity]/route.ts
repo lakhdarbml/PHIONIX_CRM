@@ -5,9 +5,11 @@ const ALLOWED = new Set([
   'Personne','Role','Employe','Client','Produit','Opportunite','Type_Interaction','Objectif','Interaction','Task','Conversation','Participant','Message'
 ]);
 
-export async function GET(request: Request, { params }: { params: { entity: string } }) {
+export async function GET(request: Request, context: any) {
   try {
-    const { entity } = params;
+    let params: any = context?.params;
+    if (params && typeof params.then === 'function') params = await params;
+    const { entity } = params || {};
     if (!ALLOWED.has(entity)) return NextResponse.json({ error: 'Entity not allowed' }, { status: 400 });
 
     const rows = await query(`SELECT * FROM \`${entity}\``);

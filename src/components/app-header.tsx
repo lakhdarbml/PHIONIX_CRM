@@ -1,6 +1,7 @@
 'use client';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { UserNav } from '@/components/user-nav';
+import { NotificationBell } from '@/components/notification-bell';
 import { usePathname } from 'next/navigation';
 
 export function AppHeader() {
@@ -12,13 +13,20 @@ export function AppHeader() {
   };
 
   return (
-    <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6">
-       <SidebarTrigger className="sm:hidden" />
-       <h1 className="text-xl font-semibold font-headline">{getTitle()}</h1>
-       <div className="relative ml-auto flex-1 md:grow-0">
-         {/* Future search bar can go here */}
-       </div>
-       <UserNav />
+    <header className="sticky top-0 z-20 flex w-full items-center gap-4 border-b bg-white/60 backdrop-blur-sm px-4 py-2 shadow-sm dark:bg-[rgba(6,8,15,0.6)] sm:px-6">
+      <div className="flex items-center gap-2">
+        <SidebarTrigger className="md:hidden" />
+        <h1 className="text-lg font-semibold leading-tight md:text-xl font-headline">{getTitle()}</h1>
+      </div>
+
+      {/* search intentionally removed per UX request */}
+
+      <div className="ml-auto flex items-center gap-3">
+        <div className="hidden sm:flex">
+          <NotificationBell />
+        </div>
+        <UserNav />
+      </div>
     </header>
   );
 }
