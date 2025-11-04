@@ -49,7 +49,7 @@ io.on('connection', (socket) => {
 
         // Check conversation ban status from DB to prevent bypassing API
         try {
-          const [rows] = await pool.execute('SELECT is_banned FROM Conversation WHERE id_conversation = ?', [message.id_conversation]);
+          const [rows] = await pool.execute('SELECT is_banned FROM conversation WHERE id_conversation = ?', [message.id_conversation]);
           const convo = Array.isArray(rows) ? rows[0] : rows;
           if (convo && (convo.is_banned === 1 || convo.is_banned === '1')) {
             // Inform sender that conversation is banned and do not broadcast

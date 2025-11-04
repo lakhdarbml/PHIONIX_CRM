@@ -39,13 +39,15 @@ import { AddTaskDialog } from "@/components/add-task-dialog";
 type Task = {
     id_task: string;
     titre: string;
-    type: 'Professionnel' | 'Personnel';
+    description?: string | null;
     statut: 'Ouverte' | 'En Cours' | 'Terminée' | 'Annulée' | 'PendingValidation';
     priorite: 'Basse' | 'Moyenne' | 'Haute';
+    date_creation?: string;
+    date_echeance?: string | null;
+    id_createur: string;
     id_assigner_a: string;
-    id_client: string | null;
-    date_echeance?: string;
-    [key: string]: any;
+    id_client?: string | null;
+    updated_at?: string;
 };
 
 
@@ -75,17 +77,18 @@ const statusIcon: { [key: string]: React.ElementType } = {
     'Annulée': AlertTriangle,
 };
 
-const typeVariant: { [key in Task['type']]: "default" | "secondary" } = {
-  'Professionnel': "secondary",
-  'Personnel': "default",
+// Tasks don't have types in the DB schema, so we'll derive it from client_id
+const typeVariant = {
+  'Professionnel': "secondary" as const,
+  'Personnel': "default" as const,
 };
 
-const typeIcon: { [key in Task['type']]: React.ElementType } = {
+const typeIcon = {
   'Professionnel': Briefcase,
   'Personnel': User,
 };
 
-const ALL_STATUSES = ['Ouverte', 'En Cours', 'Terminée', 'Annulée'];
+const ALL_STATUSES = ['Ouverte', 'En Cours', 'Terminée', 'Annulée', 'PendingValidation'];
 const ALL_PRIORITIES = ['Basse', 'Moyenne', 'Haute'];
 
 
@@ -126,16 +129,23 @@ export default function TasksPage() {
 
     const tasks = tasksData as Task[];
     const employe = (employes || []).find(e => String(e.id_personne) === String(user.personneId));
+    
+    // Si pas d'employé trouvé, retourner tableau vide
+    if (!employe) return [];
 
     if (user.role === 'admin' || user.role === 'manager') {
       return tasks;
     }
     
-    if (employe) {
-      // Employees see all tasks assigned to them, personal or professional
-      return (tasks || []).filter(t => String(t.id_assigner_a) === String(employe.id_employe));
-    }
-    return [];
+    // Pour les autres rôles (sales, support, etc.)
+    return tasks.filter(task => {
+      // Tâches professionnelles : l'employé doit être assigné
+      if (task.id_client) {
+        return String(task.id_assigner_a) === String(employe.id_employe);
+      }
+      // Tâches personnelles : l'employé doit être le créateur
+      return String(task.id_createur) === String(employe.id_employe);
+    });
   }, [user, tasksData, employes]);
 
   const filteredTasks = useMemo(() => {
@@ -146,8 +156,17 @@ export default function TasksPage() {
     });
   }, [allTasks, statusFilters, priorityFilters]);
 
-  const professionalTasks = filteredTasks.filter(task => task.type === 'Professionnel');
-  const personalTasks = filteredTasks.filter(task => task.type === 'Personnel');
+  // Tasks with client_id are professional, others are personal
+  const professionalTasks = filteredTasks.filter(task => task.id_client != null);
+  const personalTasks = filteredTasks.filter(task => {
+    // Tâches personnelles : pas de client ET soit admin/manager, soit créateur = employé courant
+    if (task.id_client != null) return false;
+    
+    if (user?.role === 'admin' || user?.role === 'manager') return true;
+    
+    const employe = (employes || []).find(e => String(e.id_personne) === String(user?.personneId));
+    return employe && String(task.id_createur) === String(employe.id_employe);
+  });
 
 
   const canAddTask = user?.role === 'manager' || user?.role === 'sales' || user?.role === 'support' || user?.role === 'admin';
@@ -224,7 +243,7 @@ export default function TasksPage() {
                     return (
                         <TableRow key={task.id_task}>
                             <TableCell className="font-medium">{task.titre}</TableCell>
-                             {!isPersonal && <TableCell>{getClientName(task.id_client)}</TableCell>}
+                             {!isPersonal && <TableCell>{getClientName(task.id_client || null)}</TableCell>}
                             <TableCell>
                                 <Badge variant={statusVariant[task.statut] || 'outline'} className="capitalize">
                                     {StatusIcon && <StatusIcon className="h-3 w-3 mr-1" />}

@@ -34,6 +34,9 @@ export function AddTaskDialog({ onTaskAdded }: AddTaskDialogProps) {
     id_assigner_a: '',
   });
 
+  const initialErrors = { titre: false, description: false, id_assigner_a: false, date_echeance: false, id_client: false };
+  const [errors, setErrors] = useState(initialErrors);
+
   useEffect(() => {
     if (open) {
       fetchData();
@@ -68,51 +71,41 @@ export function AddTaskDialog({ onTaskAdded }: AddTaskDialogProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    let err = {
+      titre: !formData.titre.trim(),
+      description: !formData.description.trim(),
+      id_assigner_a: !formData.id_assigner_a,
+      date_echeance: !formData.date_echeance,
+      id_client: (!isPersonal && !formData.id_client) ? true : false
+    };
+    setErrors(err);
+    if (Object.values(err).some(Boolean)) {
+      toast({ title:'Erreur', description:'Champs obligatoires manquants',variant:'destructive'});
+      return;
+    }
     setLoading(true);
-
     try {
       const response = await fetch('/api/task', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...formData,
-          valide: user?.role === 'admin' ? true : false,
+          valide: user?.role === 'admin',
           status: user?.role === 'admin' ? 'Ouverte' : 'PendingValidation',
           date_creation: new Date().toISOString(),
-        }),
+        })
       });
-
       if (!response.ok) {
-        throw new Error('Failed to create task');
+        const errMsg = await response.json().catch(()=>({error:'Erreur serveur'}));
+        throw new Error(errMsg.error||'Création impossible');
       }
-
-      toast({
-        title: "Success",
-        description: user?.role === 'admin' 
-          ? "Task created successfully" 
-          : "Task submitted for validation",
-      });
-
+      toast({ title:'Succès', description: user?.role==='admin'?'Tâche créée':'Soumise à validation' });
       onTaskAdded();
       setOpen(false);
-      setFormData({
-        titre: '',
-        description: '',
-        type: 'Professionnel',
-        priorite: 'Moyenne',
-        date_echeance: '',
-        id_client: '',
-        id_assigner_a: '',
-      });
-    } catch (error) {
-      console.error('Failed to create task:', error);
-      toast({
-        title: "Error",
-        description: "Failed to create task",
-        variant: "destructive",
-      });
+      setErrors(initialErrors);
+      setFormData({ titre:'', description:'', type:'Professionnel', priorite:'Moyenne', date_echeance:'', id_client:'', id_assigner_a:'' });
+    } catch (error:any) {
+      toast({ title:'Erreur', description: error?.message||'Création impossible', variant:'destructive'});
     } finally {
       setLoading(false);
     }
@@ -169,6 +162,8 @@ export function AddTaskDialog({ onTaskAdded }: AddTaskDialogProps) {
               onChange={(e) => handleChange('titre', e.target.value)}
               placeholder="Titre de la tâche"
               required
+              aria-invalid={errors.titre}
+              className={errors.titre?"border-red-500 focus-visible:ring-red-500":""}
             />
           </div>
 
@@ -180,6 +175,8 @@ export function AddTaskDialog({ onTaskAdded }: AddTaskDialogProps) {
               onChange={(e) => handleChange('description', e.target.value)}
               placeholder="Description de la tâche"
               required
+              aria-invalid={errors.description}
+              className={errors.description?"border-red-500 focus-visible:ring-red-500":""}
             />
           </div>
 
@@ -207,7 +204,7 @@ export function AddTaskDialog({ onTaskAdded }: AddTaskDialogProps) {
                 value={formData.id_client} 
                 onValueChange={(value) => handleChange('id_client', value)}
               >
-                <SelectTrigger>
+                <SelectTrigger className={errors.id_client?"border-red-500 focus-visible:ring-red-500":""}>
                   <SelectValue placeholder="Sélectionner un client" />
                 </SelectTrigger>
                 <SelectContent>
@@ -228,7 +225,7 @@ export function AddTaskDialog({ onTaskAdded }: AddTaskDialogProps) {
               onValueChange={(value) => handleChange('id_assigner_a', value)}
               required
             >
-              <SelectTrigger>
+              <SelectTrigger className={errors.id_assigner_a?"border-red-500 focus-visible:ring-red-500":""}>
                 <SelectValue placeholder="Sélectionner un employé" />
               </SelectTrigger>
               <SelectContent>
@@ -250,6 +247,8 @@ export function AddTaskDialog({ onTaskAdded }: AddTaskDialogProps) {
               onChange={(e) => handleChange('date_echeance', e.target.value)}
               min={new Date().toISOString().split('T')[0]}
               required
+              aria-invalid={errors.date_echeance}
+              className={errors.date_echeance?"border-red-500 focus-visible:ring-red-500":""}
             />
           </div>
 

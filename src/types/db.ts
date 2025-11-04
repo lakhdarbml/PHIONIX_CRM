@@ -90,8 +90,7 @@ export interface ConversationDB {
   unreadCount?: number;
 }
 
-export interface Message {
-  // DB shape
+export interface DBMessage {
   id_message?: ID;
   id_conversation?: ID;
   id_emetteur?: ID;

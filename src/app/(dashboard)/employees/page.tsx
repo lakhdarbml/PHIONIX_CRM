@@ -33,6 +33,10 @@ import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
 import { useAuth } from '@/context/auth-context';
 import { useRouter } from 'next/navigation';
+import { Dialog, DialogTitle, DialogDescription, DialogContent, DialogHeader, DialogFooter } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Select, SelectTrigger, SelectContent, SelectValue, SelectItem } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 
 // Types based on db.json structure
 type Personne = {
@@ -80,6 +84,14 @@ export default function EmployeesPage() {
   const [personnes, setPersonnes] = useState<any[]>([]);
   const [roles, setRoles] = useState<any[]>([]);
   const [employes, setEmployes] = useState<any[]>([]);
+  const [showForm, setShowForm] = useState(false);
+  const [nom, setNom] = useState('');
+  const [prenom, setPrenom] = useState('');
+  const [email, setEmail] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [telephone, setTelephone] = useState('');
+  const [role, setRole] = useState('');
+  const [message, setMessage] = useState('');
 
   useEffect(() => {
     let mounted = true;
@@ -134,11 +146,30 @@ export default function EmployeesPage() {
   const isAdmin = user?.role === 'admin';
 
   const handleRequestClick = () => {
-    toast({
-      title: "Demande Envoyée",
-      description: "Votre demande d'ajout d'un nouvel employé a été envoyée à l'administrateur.",
-    });
+    setShowForm(true);
   };
+  async function handleDemandeSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!nom || !prenom || !email || !role) {
+      toast({ title: "Champs obligatoires", description: "Prénom, nom, email et rôle requis." });
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      const res = await fetch('/api/employe/requests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nom, prenom, email, telephone, role, message })
+      });
+      if (res.ok) {
+        toast({ title: "Demande envoyée", description: "Votre demande a été envoyée à l'administrateur." });
+        setShowForm(false); setNom(''); setPrenom(''); setEmail(''); setTelephone(''); setRole(''); setMessage('');
+      } else {
+        const err = await res.json().catch(() => ({}));
+        toast({ title: "Erreur", description: err.error || 'Erreur lors de la demande.' , variant: 'destructive'});
+      }
+    } finally { setIsSubmitting(false); }
+  }
 
   const handleRowClick = (employeeId: string) => {
     router.push(`/employees/${employeeId}`);
@@ -192,12 +223,45 @@ export default function EmployeesPage() {
             </Button>
           )}
           {isManager && (
-            <Button size="sm" className="h-8 gap-1" onClick={handleRequestClick}>
-              <FilePlus2 className="h-3.5 w-3.5" />
-              <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
-                Demander un nouvel employé
-              </span>
-            </Button>
+            <>
+              <Button size="sm" className="h-8 gap-1" onClick={handleRequestClick}>
+                <FilePlus2 className="h-3.5 w-3.5" />
+                <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
+                  Demander un nouvel employé
+                </span>
+              </Button>
+              <Dialog open={showForm} onOpenChange={setShowForm}>
+                <DialogContent>
+                  <form onSubmit={handleDemandeSubmit}>
+                    <DialogHeader>
+                      <DialogTitle>Demander un nouvel employé</DialogTitle>
+                      <DialogDescription>Remplissez les informations pour envoyer une demande à l'administrateur.</DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-3 py-2">
+                      <Input placeholder="Prénom" value={prenom} onChange={e=>setPrenom(e.target.value)} required />
+                      <Input placeholder="Nom" value={nom} onChange={e=>setNom(e.target.value)} required />
+                      <Input placeholder="Email" type="email" value={email} onChange={e=>setEmail(e.target.value)} required />
+                      <Input placeholder="Téléphone" value={telephone} onChange={e=>setTelephone(e.target.value)} />
+                      <Select value={role} onValueChange={setRole} required>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Rôle souhaité" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {roles.filter((r:any)=>r.libelle!=="admin" && r.libelle!=="client").map(r=>(
+                            <SelectItem key={r.id_role} value={r.libelle}>{r.libelle}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Textarea placeholder="Message complémentaire (facultatif)" value={message} onChange={e=>setMessage(e.target.value)} />
+                    </div>
+                    <DialogFooter className="pt-2">
+                      <Button type="submit" disabled={isSubmitting}>{isSubmitting ? 'Envoi...' : 'Envoyer'}</Button>
+                      <Button type="button" variant="outline" onClick={()=>setShowForm(false)}>Annuler</Button>
+                    </DialogFooter>
+                  </form>
+                </DialogContent>
+              </Dialog>
+            </>
           )}
         </div>
       </CardHeader>

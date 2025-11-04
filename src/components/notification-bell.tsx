@@ -90,21 +90,24 @@ export function NotificationBell() {
 
   const markAsRead = useCallback(async (id: ID) => {
     try {
+      if (!user?.personneId) return;
       const res = await fetch(`/api/notification/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lu: true }),
+        body: JSON.stringify({ lu: true, user_id: user.personneId }),
       });
       if (res.ok) {
-        // Update local state
+        // Update local state immediately for responsiveness
         setNotifications(prev => prev.map(n => 
           String(n.id_notification) === String(id) ? { ...n, lu: true } : n
         ));
+        // Refresh from server to ensure consistency (e.g., unread counter)
+        fetchNotifications();
       }
     } catch (e) {
       console.error('Failed to mark notification as read', e);
     }
-  }, []);
+  }, [user?.personneId, fetchNotifications]);
 
   const router = useRouter();
 

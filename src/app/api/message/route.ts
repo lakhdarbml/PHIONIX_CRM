@@ -9,7 +9,7 @@ export async function POST(request: Request) {
 
   // Check conversation status: do not allow posting to banned conversations
   try {
-    const [conversation] = await query('SELECT * FROM Conversation WHERE id_conversation = ?', [id_conversation]) as any[];
+    const [conversation] = await query('SELECT * FROM conversation WHERE id_conversation = ?', [id_conversation]) as any[];
     if (!conversation) {
       return NextResponse.json({ error: 'Conversation not found' }, { status: 404 });
     }
@@ -22,7 +22,7 @@ export async function POST(request: Request) {
           // allowed
         } else {
           // Check whether sender is an employe and has role 'admin'
-          const [employe] = await query(`SELECT e.*, r.libelle as role_name FROM Employe e JOIN Role r ON e.id_role = r.id_role WHERE e.id_personne = ?`, [id_emetteur]) as any[];
+          const [employe] = await query(`SELECT e.*, r.libelle as role_name FROM employe e JOIN role r ON e.id_role = r.id_role WHERE e.id_personne = ?`, [id_emetteur]) as any[];
           if (!employe || String((employe.role_name || '').toLowerCase()) !== 'admin') {
             return NextResponse.json({ error: 'Conversation is banned' }, { status: 403 });
           }
@@ -37,9 +37,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Failed to verify conversation status' }, { status: 500 });
   }
 
-  const result: any = await query('INSERT INTO Message (contenu, date_envoi, id_emetteur, id_conversation) VALUES (?, ?, ?, ?)', [contenu, new Date(), id_emetteur, id_conversation]);
+  const result: any = await query('INSERT INTO message (contenu, date_envoi, id_emetteur, id_conversation) VALUES (?, ?, ?, ?)', [contenu, new Date(), id_emetteur, id_conversation]);
   const insertId = (result).insertId;
-  const rows = await query('SELECT * FROM Message WHERE id_message = ?', [insertId]);
+  const rows = await query('SELECT * FROM message WHERE id_message = ?', [insertId]);
 
   const created = rows[0] || null;
 

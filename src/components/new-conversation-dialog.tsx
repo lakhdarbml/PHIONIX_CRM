@@ -36,6 +36,8 @@ export function NewConversationDialog({ isOpen, onOpenChange, onCreateConversati
   const { user } = useAuth();
   const [title, setTitle] = useState('');
   const [selectedEmployees, setSelectedEmployees] = useState<FullEmployee[]>([]);
+  const [errors, setErrors] = useState({ title: false, participants: false });
+  const [submitting, setSubmitting] = useState(false);
 
   const otherEmployees = user ? employees.filter(e => e.email !== user.email) : [];
 
@@ -48,25 +50,28 @@ export function NewConversationDialog({ isOpen, onOpenChange, onCreateConversati
   };
 
   const handleSubmit = () => {
-
-      if (title && selectedEmployees.length > 0 && user) {
-      const participants = selectedEmployees.map(e => ({
-        id: e.id_personne ?? e.id ?? `emp_${Date.now()}`,
-        name: `${e.prenom ?? ''} ${e.nom ?? ''}`.trim(),
-        avatar: '' 
-      }));
-
-      // Add current user
-      participants.push({
-          id: user.personneId,
-          name: user.displayName || 'Moi',
+    let err = { title: !title.trim(), participants: selectedEmployees.length === 0 };
+    setErrors(err);
+    if (err.title || err.participants) {
+      return;
+    }
+    setSubmitting(true);
+    try {
+      if (user) {
+        const participants = selectedEmployees.map(e => ({
+          id: e.id_personne ?? e.id ?? `emp_${Date.now()}`,
+          name: `${e.prenom ?? ''} ${e.nom ?? ''}`.trim(),
           avatar: ''
-      });
-
-      onCreateConversation(title, participants);
-      onOpenChange(false);
-      setTitle('');
-      setSelectedEmployees([]);
+        }));
+        participants.push({ id: user.personneId, name: user.displayName || 'Moi', avatar: '' });
+        onCreateConversation(title, participants); // parent doit gérer le toast
+        onOpenChange(false);
+        setTitle('');
+        setSelectedEmployees([]);
+        setErrors({ title: false, participants: false });
+      }
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -87,14 +92,17 @@ export function NewConversationDialog({ isOpen, onOpenChange, onCreateConversati
             <Input
               id="title"
               value={title}
+              aria-invalid={errors.title}
+              className={errors.title ? "border-red-500 focus:ring-red-500" : ""}
               onChange={e => setTitle(e.target.value)}
-              className="col-span-3"
               placeholder="ex : Planification Projet Alpha"
             />
           </div>
           <div className="grid grid-cols-4 items-start gap-4">
             <Label className="text-right pt-2">Participants</Label>
-            <ScrollArea className="col-span-3 h-48 rounded-md border p-2">
+            <ScrollArea className={"col-span-3 h-48 rounded-md border p-2 "+(errors.participants?"border-red-500 ring-red-500":"")}
+              aria-invalid={errors.participants}
+            >
               <div className="space-y-2">
                 {otherEmployees.map(employee => (
                   <div key={employee.id_employe} className="flex items-center space-x-2">
@@ -122,7 +130,7 @@ export function NewConversationDialog({ isOpen, onOpenChange, onCreateConversati
         </div>
         <DialogFooter>
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Annuler</Button>
-          <Button type="submit" onClick={handleSubmit} disabled={!title || selectedEmployees.length === 0}>Créer la conversation</Button>
+          <Button type="submit" onClick={handleSubmit} disabled={submitting}>{submitting?"Création...":"Créer la conversation"}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

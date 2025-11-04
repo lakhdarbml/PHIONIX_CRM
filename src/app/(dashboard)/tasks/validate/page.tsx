@@ -12,16 +12,17 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/auth-context";
 
 interface Task {
-  id_tache: number;
+  id_task: number;
   titre: string;
-  description: string;
-  priorite: string;
-  status: string;
+  description: string | null;
+  priorite: 'Basse' | 'Moyenne' | 'Haute';
+  statut: 'Ouverte' | 'En Cours' | 'Terminée' | 'Annulée' | 'PendingValidation';
   date_creation: string;
-  date_echeance: string;
+  date_echeance: string | null;
   id_createur: number;
-  id_assigne: number;
-  valide: boolean;
+  id_assigner_a: number;
+  id_client: number | null;
+  updated_at: string;
 }
 
 interface User {
@@ -41,7 +42,7 @@ export default function ValidateTasksPage() {
     const fetchData = async () => {
       try {
         const [tasksRes, usersRes] = await Promise.all([
-          fetch('/api/data/Tache?valide=false'),
+          fetch('/api/data/Task?statut=PendingValidation'),
           fetch('/api/data/Personne')
         ]);
 
@@ -83,8 +84,8 @@ export default function ValidateTasksPage() {
         throw new Error('Failed to validate task');
       }
 
-      // Update local state
-      setTasks(tasks.filter(task => task.id_tache !== taskId));
+      // Update local state to remove the validated/rejected task
+      setTasks(tasks.filter(task => task.id_task !== taskId));
 
       toast({
         title: "Success",
@@ -149,15 +150,15 @@ export default function ValidateTasksPage() {
               </TableHeader>
               <TableBody>
                 {tasks.map((task) => (
-                  <TableRow key={task.id_tache}>
+                  <TableRow key={task.id_task}>
                     <TableCell>
                       <div>
                         <div className="font-medium">{task.titre}</div>
-                        <div className="text-sm text-muted-foreground">{task.description}</div>
+                        <div className="text-sm text-muted-foreground">{task.description || ''}</div>
                       </div>
                     </TableCell>
                     <TableCell>{getUserName(task.id_createur)}</TableCell>
-                    <TableCell>{getUserName(task.id_assigne)}</TableCell>
+                    <TableCell>{getUserName(task.id_assigner_a)}</TableCell>
                     <TableCell>
                       <Badge
                         className={priorityColors[task.priorite.toLowerCase()]}
@@ -167,21 +168,20 @@ export default function ValidateTasksPage() {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      {new Date(task.date_echeance).toLocaleDateString()}
-                    </TableCell>
+                      {task.date_echeance ? new Date(task.date_echeance).toLocaleDateString() : 'No deadline'}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => handleTaskValidation(task.id_tache, true)}
+                          onClick={() => handleTaskValidation(task.id_task, true)}
                         >
                           <CheckCircle2 className="h-4 w-4 text-green-600" />
                         </Button>
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => handleTaskValidation(task.id_tache, false)}
+                          onClick={() => handleTaskValidation(task.id_task, false)}
                         >
                           <XCircle className="h-4 w-4 text-red-600" />
                         </Button>

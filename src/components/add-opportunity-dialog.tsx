@@ -21,6 +21,10 @@ export function AddOpportunityDialog({ onOpportunityAdded }: AddOpportunityDialo
   const [loading, setLoading] = useState(false);
   const [clients, setClients] = useState<any[]>([]);
   const [salesEmployees, setSalesEmployees] = useState<any[]>([]);
+  const [employees, setEmployees] = useState<any[]>([]);
+  const [roles, setRoles] = useState<any[]>([]);
+  const [personnes, setPersonnes] = useState<any[]>([]);
+  const [loadingData, setLoadingData] = useState(false);
 
   const [formData, setFormData] = useState({
     titre: '',
@@ -30,23 +34,85 @@ export function AddOpportunityDialog({ onOpportunityAdded }: AddOpportunityDialo
     id_employe: ''
   });
 
+  const initialErrors = { titre: false, id_client: false, id_employe: false, valeur: false };
+  const [errors, setErrors] = useState(initialErrors);
+
   useEffect(() => {
     // Fetch clients and sales employees
     const fetchData = async () => {
+      setLoadingData(true);
       try {
-        const [clientsRes, employeesRes] = await Promise.all([
+        const [clientsRes, employeesRes, personnesRes, rolesRes] = await Promise.all([
           fetch('/api/data/Client'),
-          fetch('/api/data/Employe')
+          fetch('/api/data/Employe'),
+          fetch('/api/data/Personne'),
+          fetch('/api/data/Role')
         ]);
 
+        let clientsData: any[] = [];
+        let employeesData: any[] = [];
+        let personnesData: any[] = [];
+        let rolesData: any[] = [];
+
         if (clientsRes.ok) {
-          const clientsData = await clientsRes.json();
+          clientsData = await clientsRes.json();
           setClients(clientsData);
         }
 
         if (employeesRes.ok) {
-          const employeesData = await employeesRes.json();
-          setSalesEmployees(employeesData.filter((e: any) => e.role === 'sales'));
+          employeesData = await employeesRes.json();
+          setEmployees(employeesData);
+        }
+
+        if (rolesRes.ok) {
+          rolesData = await rolesRes.json();
+          setRoles(rolesData);
+        }
+
+        if (personnesRes.ok) {
+          personnesData = await personnesRes.json();
+          setPersonnes(personnesData);
+        }
+
+        // Map employees with sales role
+        if (employeesData.length > 0 && rolesData.length > 0 && personnesData.length > 0) {
+          const rolesMap = new Map(rolesData.map((r: any) => [String(r.id_role), r]));
+          const personnesMap = new Map(personnesData.map((p: any) => [String(p.id_personne), p]));
+          
+          // Find sales role IDs (case-insensitive)
+          const salesRoleIds = rolesData
+            .filter((r: any) => String(r.libelle).toLowerCase().trim() === 'sales')
+            .map((r: any) => String(r.id_role));
+          
+          console.log('Sales role IDs found:', salesRoleIds);
+          console.log('Total employees:', employeesData.length);
+          
+          const salesEmps = employeesData
+            .filter((e: any) => {
+              const eRoleId = String(e.id_role);
+              const isSales = salesRoleIds.includes(eRoleId);
+              if (isSales) {
+                console.log('Found sales employee:', e.id_employe, 'with role:', eRoleId);
+              }
+              return isSales;
+            })
+            .map((e: any) => {
+              const p = personnesMap.get(String(e.id_personne)) as any;
+              const emp = {
+                ...e,
+                nom: p?.nom || '',
+                prenom: p?.prenom || ''
+              };
+              console.log('Mapped sales employee:', emp);
+              return emp;
+            });
+          
+          console.log('Final sales employees:', salesEmps.length, salesEmps);
+          setSalesEmployees(salesEmps);
+          
+          if (salesEmps.length === 0) {
+            console.warn('No sales employees found. Available roles:', rolesData.map((r: any) => r.libelle));
+          }
         }
       } catch (error) {
         console.error('Failed to fetch data:', error);
@@ -55,6 +121,8 @@ export function AddOpportunityDialog({ onOpportunityAdded }: AddOpportunityDialo
           description: "Failed to load required data",
           variant: "destructive",
         });
+      } finally {
+        setLoadingData(false);
       }
     };
 
@@ -65,46 +133,37 @@ export function AddOpportunityDialog({ onOpportunityAdded }: AddOpportunityDialo
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    let newErrors = { titre: !formData.titre.trim(), id_client: !formData.id_client, id_employe: !formData.id_employe, valeur: false };
+    if (formData.valeur && (isNaN(+formData.valeur) || +formData.valeur<0)) newErrors.valeur = true;
+    setErrors(newErrors);
+    if (Object.values(newErrors).some(Boolean)) {
+      toast({ title: 'Erreur', description: 'Veuillez remplir tous les champs obligatoires (et montant >= 0).', variant: 'destructive'});
+      return;
+    }
     setLoading(true);
-
     try {
-      const response = await fetch('/api/data/Opportunite', {
+      const response = await fetch('/api/opportunite', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ...formData,
+          titre: formData.titre,
           valeur: formData.valeur ? parseFloat(formData.valeur) : null,
-          date_creation: new Date().toISOString()
-        }),
+          etape: formData.etape || 'Prospection',
+          id_client: Number(formData.id_client),
+          id_employe: Number(formData.id_employe),
+        })
       });
-
       if (!response.ok) {
-        throw new Error('Failed to create opportunity');
+        const err = await response.json().catch(()=>({error:'Erreur serveur'}));
+        throw new Error(err.error || 'Failed to create opportunity');
       }
-
-      toast({
-        title: "Success",
-        description: "Nouvelle opportunité créée avec succès",
-      });
-
+      toast({ title: 'Succès', description: 'Nouvelle opportunité créée avec succès' });
       onOpportunityAdded();
       setOpen(false);
-      setFormData({
-        titre: '',
-        valeur: '',
-        etape: 'Prospection',
-        id_client: '',
-        id_employe: ''
-      });
-    } catch (error) {
-      console.error('Failed to create opportunity:', error);
-      toast({
-        title: "Error",
-        description: "Failed to create opportunity",
-        variant: "destructive",
-      });
+      setFormData({ titre: '', valeur: '', etape: 'Prospection', id_client: '', id_employe: '' });
+      setErrors(initialErrors);
+    } catch (error:any) {
+      toast({ title: 'Erreur', description: error?.message||'Création impossible', variant:'destructive'});
     } finally {
       setLoading(false);
     }
@@ -140,6 +199,8 @@ export function AddOpportunityDialog({ onOpportunityAdded }: AddOpportunityDialo
               onChange={(e) => handleChange('titre', e.target.value)}
               placeholder="Nom de l'opportunité"
               required
+              aria-invalid={errors.titre}
+              className={errors.titre?"border-red-500 focus-visible:ring-red-500":""}
             />
           </div>
 
@@ -153,6 +214,8 @@ export function AddOpportunityDialog({ onOpportunityAdded }: AddOpportunityDialo
               placeholder="Montant estimé"
               min="0"
               step="0.01"
+              aria-invalid={errors.valeur}
+              className={errors.valeur?"border-red-500 focus-visible:ring-red-500":""}
             />
           </div>
 
@@ -173,34 +236,53 @@ export function AddOpportunityDialog({ onOpportunityAdded }: AddOpportunityDialo
 
           <div className="space-y-2">
             <Label htmlFor="client">Client</Label>
-            <Select value={formData.id_client} onValueChange={(value) => handleChange('id_client', value)}>
-              <SelectTrigger>
+            <Select value={formData.id_client} onValueChange={(value) => handleChange('id_client', String(value))}>
+              <SelectTrigger className={errors.id_client?"border-red-500 focus-visible:ring-red-500":""}>
                 <SelectValue placeholder="Sélectionner un client" />
               </SelectTrigger>
               <SelectContent>
-                {clients.map((client) => (
-                  <SelectItem key={client.id_client} value={client.id_client}>
-                    {client.nom}
-                  </SelectItem>
-                ))}
+                {clients.map((client) => {
+                  const clientPersonne = personnes?.find((p: any) => String(p.id_personne) === String(client.id_personne));
+                  const displayName = clientPersonne ? `${clientPersonne.prenom || ''} ${clientPersonne.nom || ''}`.trim() : client.nom || `Client ${client.id_client}`;
+                  return (
+                    <SelectItem key={client.id_client} value={String(client.id_client)}>
+                      {displayName}
+                    </SelectItem>
+                  );
+                })}
               </SelectContent>
             </Select>
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="employe">Commercial responsable</Label>
-            <Select value={formData.id_employe} onValueChange={(value) => handleChange('id_employe', value)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Sélectionner un commercial" />
+            <Select value={formData.id_employe} onValueChange={(value) => handleChange('id_employe', String(value))} disabled={loadingData || salesEmployees.length === 0}>
+              <SelectTrigger className={errors.id_employe?"border-red-500 focus-visible:ring-red-500":""}>
+                <SelectValue placeholder={
+                  loadingData 
+                    ? "Chargement..." 
+                    : salesEmployees.length === 0 
+                      ? "Aucun commercial disponible" 
+                      : "Sélectionner un commercial"
+                } />
               </SelectTrigger>
               <SelectContent>
-                {salesEmployees.map((employee) => (
-                  <SelectItem key={employee.id_employe} value={employee.id_employe}>
-                    {employee.nom}
-                  </SelectItem>
-                ))}
+                {loadingData ? (
+                  <SelectItem value="loading" disabled>Chargement des commerciaux...</SelectItem>
+                ) : salesEmployees.length > 0 ? (
+                  salesEmployees.map((employee) => (
+                    <SelectItem key={employee.id_employe} value={String(employee.id_employe)}>
+                      {employee.prenom ? `${employee.prenom} ${employee.nom}` : employee.nom || `Employé ${employee.id_employe}`}
+                    </SelectItem>
+                  ))
+                ) : (
+                  <SelectItem value="none" disabled>Aucun commercial disponible</SelectItem>
+                )}
               </SelectContent>
             </Select>
+            {!loadingData && salesEmployees.length === 0 && (
+              <p className="text-xs text-muted-foreground">Aucun employé avec le rôle "sales" n'a été trouvé dans la base de données.</p>
+            )}
           </div>
 
           <div className="flex justify-end gap-2">

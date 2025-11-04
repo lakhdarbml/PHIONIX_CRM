@@ -8,17 +8,17 @@ export async function GET(request: Request, context: any) {
 
   try {
     // Get conversation details
-    const [conversation] = await query('SELECT * FROM Conversation WHERE id_conversation = ?', [id]);
+    const [conversation] = await query('SELECT * FROM conversation WHERE id_conversation = ?', [id]);
 
     if (!conversation) {
       return NextResponse.json({ error: 'Conversation not found' }, { status: 404 });
     }
 
     // Get participants
-    const participants = await query('SELECT p.*, per.nom, per.prenom FROM Participant p JOIN Personne per ON p.id_personne = per.id_personne WHERE p.id_conversation = ?', [id]);
+    const participants = await query('SELECT p.*, per.nom, per.prenom FROM participant p JOIN personne per ON p.id_personne = per.id_personne WHERE p.id_conversation = ?', [id]);
 
     // Get messages
-    const messages = await query('SELECT m.*, per.nom, per.prenom FROM Message m JOIN Personne per ON m.id_emetteur = per.id_personne WHERE m.id_conversation = ? ORDER BY m.date_envoi ASC', [id]);
+    const messages = await query('SELECT m.*, per.nom, per.prenom FROM message m JOIN personne per ON m.id_emetteur = per.id_personne WHERE m.id_conversation = ? ORDER BY m.date_envoi ASC', [id]);
 
     return NextResponse.json({
       ...conversation,
@@ -42,11 +42,11 @@ export async function PUT(request: Request, context: any) {
 
   try {
     await query(
-      'UPDATE Conversation SET titre = ?, is_banned = ? WHERE id_conversation = ?',
+      'UPDATE conversation SET titre = ?, is_banned = ? WHERE id_conversation = ?',
       [body.titre, body.isBanned, id]
     );
 
-    const [updated] = await query('SELECT * FROM Conversation WHERE id_conversation = ?', [id]);
+    const [updated] = await query('SELECT * FROM conversation WHERE id_conversation = ?', [id]);
     return NextResponse.json(updated);
   } catch (error) {
     console.error('Failed to update conversation:', error);
@@ -64,13 +64,13 @@ export async function DELETE(request: Request, context: any) {
 
   try {
     // Delete messages first (foreign key constraint)
-    await query('DELETE FROM Message WHERE id_conversation = ?', [id]);
+    await query('DELETE FROM message WHERE id_conversation = ?', [id]);
     
     // Delete participants
-    await query('DELETE FROM Participant WHERE id_conversation = ?', [id]);
+    await query('DELETE FROM participant WHERE id_conversation = ?', [id]);
     
     // Delete conversation
-    await query('DELETE FROM Conversation WHERE id_conversation = ?', [id]);
+    await query('DELETE FROM conversation WHERE id_conversation = ?', [id]);
 
     return NextResponse.json({ success: true });
   } catch (error) {

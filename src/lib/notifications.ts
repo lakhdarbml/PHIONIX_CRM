@@ -8,9 +8,9 @@ export async function canUserReceiveNotification(userId: ID, notificationType: s
     // Some users are clients (not present in Employe). In that case we fallback to 'client'.
     const [row] = await query<{ libelle: string }[]>(
       `SELECT r.libelle
-       FROM Personne p
-       LEFT JOIN Employe e ON e.id_personne = p.id_personne
-       LEFT JOIN Role r ON e.id_role = r.id_role
+       FROM personne p
+       LEFT JOIN employe e ON e.id_personne = p.id_personne
+       LEFT JOIN role r ON e.id_role = r.id_role
        WHERE p.id_personne = ?`,
       [userId]
     );
@@ -20,7 +20,7 @@ export async function canUserReceiveNotification(userId: ID, notificationType: s
       userRole = String(row.libelle).toLowerCase();
     } else {
       // If no employe role, check if this person is a client
-      const clientRows = await query<any[]>('SELECT 1 FROM Client WHERE id_personne = ? LIMIT 1', [userId]);
+      const clientRows = await query<any[]>('SELECT 1 FROM client WHERE id_personne = ? LIMIT 1', [userId]);
       if (clientRows && clientRows.length > 0) {
         userRole = 'client';
       }
@@ -41,7 +41,7 @@ export async function getUserNotificationPreferences(userId: ID): Promise<Record
   try {
     // Database stores preferences with columns: id_personne, type_notification, in_app_enabled
     const rows = await query<{ type_notification: string; in_app_enabled: number }[]>(
-      'SELECT type_notification, in_app_enabled FROM NotificationPreferences WHERE id_personne = ?',
+      'SELECT type_notification, in_app_enabled FROM notificationpreferences WHERE id_personne = ?',
       [userId]
     );
 

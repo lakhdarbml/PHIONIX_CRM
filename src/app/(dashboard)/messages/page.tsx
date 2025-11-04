@@ -15,11 +15,11 @@ import { useToast } from '@/hooks/use-toast';
 import { ContactsDialog } from '@/components/contacts-dialog';
 import { useAuth, type User as AuthUser } from '@/context/auth-context';
 import { io } from 'socket.io-client';
-import type { ID, Personne, Employe, ConversationDB, Participant, Message, Opportunite, Interaction as InteractionType, Task as TaskType, UIParticipant } from '@/types/db';
+import type { ID, Personne, Employe, ConversationDB, Participant, DBMessage, Opportunite, Interaction as InteractionType, Task as TaskType, UIParticipant } from '@/types/db';
 import { TableRowSkeleton, MessageSkeleton } from '@/components/ui/skeleton-loader';
 import type { ChangeEvent } from 'react';
 
-type PopulatedMessage = Message & { senderName: string };
+type PopulatedMessage = DBMessage & { senderName: string };
 
 type PopulatedParticipant = {
     id: string;
@@ -397,7 +397,7 @@ export default function MessagesPage() {
     const [personnes, setPersonnes] = useState<Personne[]>([]);
     const [employes, setEmployes] = useState<Employe[]>([]);
     const [conversationsData, setConversationsData] = useState<ConversationDB[]>([]);
-    const [messagesData, setMessagesData] = useState<Message[]>([]);
+    const [messagesData, setMessagesData] = useState<DBMessage[]>([]);
     const [participants, setParticipants] = useState<Participant[]>([]);
     const [opportunities, setOpportunities] = useState<Opportunite[]>([]);
     const [interactions, setInteractions] = useState<InteractionType[]>([]);
@@ -462,7 +462,7 @@ export default function MessagesPage() {
     useEffect(() => {
         if (selectedConversationId) {
             const personnesMap = new Map((personnes as Personne[]).map(p => [String(p.id_personne), p]));
-            const conversationMessages = (messagesData as Message[])
+            const conversationMessages = (messagesData as DBMessage[])
                 .filter(m => String(m.id_conversation) === String(selectedConversationId))
                 .map(msg => {
                     const sender = personnesMap.get(String(msg.id_emetteur));
@@ -653,7 +653,7 @@ export default function MessagesPage() {
                     };
                 });
 
-            const lastMessage = (messagesData as Message[]).filter(m => safeId(m.id_conversation) === safeId(conv.id_conversation)).sort((a, b) => {
+            const lastMessage = (messagesData as DBMessage[]).filter(m => safeId(m.id_conversation) === safeId(conv.id_conversation)).sort((a, b) => {
                 const ta = a.date_envoi ? new Date(a.date_envoi).getTime() : 0;
                 const tb = b.date_envoi ? new Date(b.date_envoi).getTime() : 0;
                 return tb - ta;

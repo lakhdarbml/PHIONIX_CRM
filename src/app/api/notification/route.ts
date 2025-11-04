@@ -18,7 +18,7 @@ export async function GET(request: Request) {
 
     // Get all notifications for the user
     const sql = `
-      SELECT * FROM Notification 
+      SELECT * FROM notification 
       WHERE destinataire_id = ? 
       ORDER BY date_creation DESC
     `;
@@ -73,8 +73,8 @@ export async function POST(request: Request) {
 
     // Create the notification
     // DB schema has column `type_notification` and `destinataire_id` for recipient
-    const sql = 'INSERT INTO Notification (titre, message, destinataire_id, type_notification, meta) VALUES (?, ?, ?, ?, ?)';
-    const res: any = await query(sql, [
+    const sqlInsert = 'INSERT INTO notification (titre, message, destinataire_id, type_notification, meta) VALUES (?, ?, ?, ?, ?)';
+    const res: any = await query(sqlInsert, [
       titre,
       message,
       destinataire_id,
@@ -83,7 +83,7 @@ export async function POST(request: Request) {
     ]);
 
     const [created] = await query<any[]>(
-      'SELECT * FROM Notification WHERE id_notification = ?',
+      'SELECT * FROM notification WHERE id_notification = ?',
       [res.insertId]
     );
 
@@ -99,29 +99,52 @@ export async function PUT(request: Request) {
   try {
     const url = new URL(request.url);
     const parts = url.pathname.split('/');
-    const id = parts[parts.length - 1];
+    const notificationId = parts[parts.length - 1];
+    
+    if (!notificationId || isNaN(Number(notificationId))) {
+      return NextResponse.json({ error: 'Invalid notification ID' }, { status: 400 });
+    }
+
     const body = await request.json();
+    const { user_id } = body;
+
+    if (!user_id) {
+      return NextResponse.json({ error: 'Missing user_id' }, { status: 400 });
+    }
+
+    // First verify this notification belongs to the user
+    const [notification] = await query<any[]>(
+      'SELECT * FROM notification WHERE id_notification = ? AND destinataire_id = ?',
+      [notificationId, user_id]
+    );
+
+    if (!notification) {
+      return NextResponse.json({ error: 'Notification not found or access denied' }, { status: 404 });
+    }
 
     // If updating read status
     if (body.lu !== undefined) {
       if (body.lu) {
         // mark as read and set date_lecture
         await query(
-          'UPDATE Notification SET lu = ?, date_lecture = ? WHERE id_notification = ?',
-          [1, new Date(), id]
+          'UPDATE notification SET lu = ?, date_lecture = ? WHERE id_notification = ? AND destinataire_id = ?',
+          [1, new Date(), notificationId, user_id]
         );
       } else {
         // mark as unread and clear date_lecture
         await query(
-          'UPDATE Notification SET lu = ?, date_lecture = NULL WHERE id_notification = ?',
-          [0, id]
+          'UPDATE notification SET lu = ?, date_lecture = NULL WHERE id_notification = ? AND destinataire_id = ?',
+          [0, notificationId, user_id]
         );
       }
-      const [row] = await query<any[]>(
-        'SELECT * FROM Notification WHERE id_notification = ?',
-        [id]
+
+      // Get updated notification
+      const [updated] = await query<any[]>(
+        'SELECT * FROM notification WHERE id_notification = ?',
+        [notificationId]
       );
-      return NextResponse.json(row || null);
+
+      return NextResponse.json(updated || null);
     }
 
     return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
