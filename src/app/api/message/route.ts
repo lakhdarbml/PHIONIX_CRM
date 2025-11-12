@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/mysql';
 import emitNotification from '@/lib/notify';
+import { generateFromConversationMessages } from '@/lib/interaction-generator';
+import { logger } from '@/lib/logger';
 
 export async function POST(request: Request) {
   const body = await request.json();
@@ -9,6 +11,7 @@ export async function POST(request: Request) {
 
   // Check conversation status: do not allow posting to banned conversations
   try {
+    logger.debug('api.message.POST', 'Checking conversation status', { id_conversation, id_emetteur });
     const [conversation] = await query('SELECT * FROM conversation WHERE id_conversation = ?', [id_conversation]) as any[];
     if (!conversation) {
       return NextResponse.json({ error: 'Conversation not found' }, { status: 404 });
@@ -39,6 +42,7 @@ export async function POST(request: Request) {
 
   const result: any = await query('INSERT INTO message (contenu, date_envoi, id_emetteur, id_conversation) VALUES (?, ?, ?, ?)', [contenu, new Date(), id_emetteur, id_conversation]);
   const insertId = (result).insertId;
+  logger.info('api.message.POST', 'Inserted message', { insertId, id_conversation, id_emetteur });
   const rows = await query('SELECT * FROM message WHERE id_message = ?', [insertId]);
 
   const created = rows[0] || null;
@@ -64,5 +68,14 @@ export async function POST(request: Request) {
   }
 
   // Return the created message.
+  // Best-effort: générer une interaction à partir des messages récents de la conversation
+  try {
+    logger.info('api.message.POST', 'Triggering interaction generation from conversation', { id_conversation });
+    await generateFromConversationMessages(id_conversation, 30);
+    logger.info('api.message.POST', 'Interaction generation triggered');
+  } catch (e) {
+    logger.error('api.message.POST', 'Failed to generate interaction from messages', e);
+  }
+
   return NextResponse.json(created);
 }

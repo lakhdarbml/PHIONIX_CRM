@@ -79,33 +79,38 @@ export default function ReportsPage() {
         lastMonth.setMonth(lastMonth.getMonth() - 1);
 
         // Calculate metrics
-        const activeOpportunities = opportunities.filter((o: any) => 
-          o.etape !== 'Perdue' && o.etape !== 'Clôturé'
+        const activeOpportunities = (opportunities || []).filter((o: any) => 
+          o && o.etape !== 'Perdue' && o.etape !== 'Clôturé'
         );
 
-        const totalValue = activeOpportunities.reduce((sum: number, o: any) => 
-          sum + (o.valeur || 0), 0
-        );
+        const totalValue = activeOpportunities.reduce((sum: number, o: any) => {
+          const v = typeof o.valeur === 'string' ? parseFloat(o.valeur) : (typeof o.valeur === 'number' ? o.valeur : parseFloat(String(o.valeur || 0)));
+          return sum + (isNaN(v) ? 0 : v);
+        }, 0);
 
         const lastMonthTotalValue = activeOpportunities
-          .filter((o: any) => new Date(o.date_creation) < lastMonth)
-          .reduce((sum: number, o: any) => sum + (o.valeur || 0), 0);
+          .filter((o: any) => o.date_creation && new Date(o.date_creation) < lastMonth)
+          .reduce((sum: number, o: any) => {
+            const v = typeof o.valeur === 'string' ? parseFloat(o.valeur) : (typeof o.valeur === 'number' ? o.valeur : parseFloat(String(o.valeur || 0)));
+            return sum + (isNaN(v) ? 0 : v);
+          }, 0);
 
         const valueChange = lastMonthTotalValue ? 
           ((totalValue - lastMonthTotalValue) / lastMonthTotalValue) * 100 : 0;
 
-        const completedTasks = tasks.filter((t: any) => t.status === 'Terminée').length;
-        const lastMonthCompletedTasks = tasks.filter((t: any) => 
-          t.status === 'Terminée' && new Date(t.date_creation) < lastMonth
+        const safeTasks = Array.isArray(tasks) ? tasks : [];
+        const completedTasks = safeTasks.filter((t: any) => t.statut === 'Terminée').length;
+        const lastMonthCompletedTasks = safeTasks.filter((t: any) => 
+          t.statut === 'Terminée' && t.date_creation && new Date(t.date_creation) < lastMonth
         ).length;
 
         const tasksChange = lastMonthCompletedTasks ? 
           ((completedTasks - lastMonthCompletedTasks) / lastMonthCompletedTasks) * 100 : 0;
 
-        const totalClients = clients.length;
-        const lastMonthClients = clients.filter((c: any) => 
-          new Date(c.date_creation) < lastMonth
-        ).length;
+        const safeClients = Array.isArray(clients) ? clients : [];
+        const totalClients = safeClients.length;
+        // Beaucoup de schémas client n'ont pas de date_creation; si absente, on fixe le delta à 0
+        const lastMonthClients = safeClients.filter((c: any) => c.date_creation && new Date(c.date_creation) < lastMonth).length;
 
         const clientsChange = lastMonthClients ? 
           ((totalClients - lastMonthClients) / lastMonthClients) * 100 : 0;
@@ -119,13 +124,14 @@ export default function ReportsPage() {
           ((wonOpportunities - lastMonthWonOpportunities) / lastMonthWonOpportunities) * 100 : 0;
 
         // Prepare charts data
-        const opportunityStages = opportunities.reduce((acc: any, o: any) => {
+        const opportunityStages = (opportunities || []).reduce((acc: any, o: any) => {
           acc[o.etape] = (acc[o.etape] || 0) + 1;
           return acc;
         }, {});
 
-        const taskStatus = tasks.reduce((acc: any, t: any) => {
-          acc[t.status] = (acc[t.status] || 0) + 1;
+        const taskStatus = safeTasks.reduce((acc: any, t: any) => {
+          const key = t.statut || 'Inconnu';
+          acc[key] = (acc[key] || 0) + 1;
           return acc;
         }, {});
 

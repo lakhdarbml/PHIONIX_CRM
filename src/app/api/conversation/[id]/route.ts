@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
+import { logger } from '@/lib/logger';
 import { query } from '@/lib/mysql';
+import { generateFromConversationMessages } from '@/lib/interaction-generator';
 
 export async function GET(request: Request, context: any) {
   let params: any = context?.params;
@@ -79,5 +81,27 @@ export async function DELETE(request: Request, context: any) {
       { error: 'Failed to delete conversation' },
       { status: 500 }
     );
+  }
+}
+
+export async function POST(request: Request, context: any) {
+  let params: any = context?.params;
+  if (params && typeof params.then === 'function') params = await params;
+  const { id } = params || {};
+  try {
+    logger.info('api.conversation.POST', 'Received generate_interactions request', { id });
+    const body = await request.json().catch(() => ({}));
+    const action = body?.action || 'generate_interactions';
+    const lastMinutes = typeof body?.lastMinutes === 'number' ? body.lastMinutes : 30;
+    if (action !== 'generate_interactions') {
+      logger.warn('api.conversation.POST', 'Unsupported action', { action });
+      return NextResponse.json({ error: 'Unsupported action' }, { status: 400 });
+    }
+    await generateFromConversationMessages(id, lastMinutes);
+    logger.info('api.conversation.POST', 'Generation completed', { id });
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    logger.error('api.conversation.POST', 'Failed to generate interactions from conversation', error);
+    return NextResponse.json({ error: 'Failed to generate interactions' }, { status: 500 });
   }
 }

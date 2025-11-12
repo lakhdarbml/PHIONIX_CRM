@@ -131,7 +131,31 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const approveRequest = async (request: CustomerRequest) => {
-    console.log(`Approving ${request.name}. In a real app, you would now add them to db.json.`);
+    // Create personne then client via API
+    const fullName = request.name || '';
+    const [prenom, ...rest] = fullName.split(' ');
+    const nom = rest.join(' ') || prenom || 'Client';
+    const pren = rest.length > 0 ? prenom : '';
+
+    const perRes = await fetch('/api/personne', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prenom: pren, nom, email: request.email, telephone: null })
+    });
+    if (!perRes.ok) {
+      const err = await perRes.json().catch(() => ({ error: 'Failed to create personne' }));
+      throw new Error(err.error || 'Failed to create personne');
+    }
+    const personne = await perRes.json();
+    const clientRes = await fetch('/api/client', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id_personne: personne.id_personne })
+    });
+    if (!clientRes.ok) {
+      const err = await clientRes.json().catch(() => ({ error: 'Failed to create client' }));
+      throw new Error(err.error || 'Failed to create client');
+    }
     pendingRequests = pendingRequests.filter(r => r.email !== request.email);
   };
 

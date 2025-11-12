@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/mysql';
 import { emitNotification } from '@/lib/notify';
+import { generateFromOpportunity } from '@/lib/interaction-generator';
 
 export async function PUT(request: Request, context: any) {
   try {
@@ -179,6 +180,7 @@ export async function PUT(request: Request, context: any) {
     );
 
     const updatedOpp = Array.isArray(updated) ? updated[0] : updated;
+    try { await generateFromOpportunity(id, 'update'); } catch (e) { console.error('Failed to generate interaction from opportunity update', e); }
     return NextResponse.json(updatedOpp || null);
   } catch (error: any) {
     console.error('Erreur mise à jour opportunité:', error);

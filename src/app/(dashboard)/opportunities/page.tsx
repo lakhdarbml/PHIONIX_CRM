@@ -34,6 +34,7 @@ import { useAuth } from "@/context/auth-context";
 import { AddOpportunityDialog } from "@/components/add-opportunity-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
+import Link from "next/link";
 
 // Types based on db.json structure
 type Opportunite = {
@@ -174,14 +175,95 @@ export default function OpportunitiesPage() {
 
   // État pour la timeline interactive
   const [selectedStage, setSelectedStage] = useState<string | null>(null);
+  const [selectedMonth, setSelectedMonth] = useState<string | null>(null); // format YYYY-MM
+  
+  // Comptage par étape pour une barre proportionnelle
+  const stageCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    ALL_STAGES.forEach(s => { counts[s] = 0; });
+    (filteredOpportunities || []).forEach((o: any) => {
+      const key = o?.etape ?? 'Prospection';
+      counts[key] = (counts[key] || 0) + 1;
+    });
+    return counts;
+  }, [filteredOpportunities]);
+  const totalStageCount = useMemo(() => Object.values(stageCounts).reduce((a, b) => a + b, 0), [stageCounts]);
   
   // Opportunités filtrées par le clic sur la timeline
   const timelineFilteredOpportunities = useMemo(() => {
-    if (selectedStage === null) {
-      return filteredOpportunities;
+    let base = filteredOpportunities as Opportunite[];
+    if (selectedStage !== null) {
+      base = base.filter((opp: Opportunite) => opp.etape === selectedStage);
     }
-    return filteredOpportunities.filter((opp: Opportunite) => opp.etape === selectedStage);
-  }, [filteredOpportunities, selectedStage]);
+    if (selectedMonth) {
+      base = base.filter((opp: Opportunite) => {
+        const d = opp.date_creation ? new Date(opp.date_creation) : null;
+        if (!d || isNaN(d.getTime())) return false;
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        return key === selectedMonth;
+      });
+    }
+    return base;
+  }, [filteredOpportunities, selectedStage, selectedMonth]);
+
+  // Build monthly buckets for the last 12 months
+  const monthlyBuckets = useMemo(() => {
+    const buckets: Record<string, Record<string, number>> = {};
+    const now = new Date();
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      buckets[key] = {};
+    }
+    (filteredOpportunities as Opportunite[]).forEach((opp) => {
+      const d = opp.date_creation ? new Date(opp.date_creation) : null;
+      if (!d || isNaN(d.getTime())) return;
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      if (!buckets[key]) buckets[key] = {};
+      const stage = opp.etape || 'Inconnu';
+      buckets[key][stage] = (buckets[key][stage] || 0) + 1;
+    });
+    return buckets;
+  }, [filteredOpportunities]);
+
+  const monthKeys = useMemo(() => Object.keys(monthlyBuckets), [monthlyBuckets]);
+
+  const STEP_ORDER = ['Prospection', 'Qualification', 'Proposition', 'Négociation', 'Gagnée'] as const;
+  const FINAL_STAGES = ['Perdue', 'Clôturé', 'Arrêtée'] as const;
+
+  const handleSetStage = async (opportunity: Opportunite, targetStage: string) => {
+    if (!user?.personneId) {
+      toast({ title: 'Erreur', description: "Vous devez être connecté.", variant: 'destructive' });
+      return;
+    }
+    const currentIndex = STEP_ORDER.indexOf(opportunity.etape as any);
+    const targetIndex = STEP_ORDER.indexOf(targetStage as any);
+    const isSequentialMove = targetIndex === currentIndex + 1;
+    const canJump = isManagerOrAdmin;
+    if (!canJump && !isSequentialMove) {
+      toast({ title: 'Action non autorisée', description: "Vous ne pouvez avancer qu'à l'étape suivante.", variant: 'destructive' });
+      return;
+    }
+    try {
+      const res = await fetch(`/api/opportunite/${opportunity.id_opportunite}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ etape: targetStage, user_id: user.personneId })
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Échec de mise à jour' }));
+        throw new Error(err.error || 'Échec de mise à jour');
+      }
+      toast({ title: 'Étape mise à jour', description: `Nouvelle étape: ${targetStage}` });
+      // refresh
+      fetch('/api/data/Opportunite')
+        .then(r => r.ok && r.json())
+        .then(data => setOpportunites(data))
+        .catch(console.error);
+    } catch (e: any) {
+      toast({ title: 'Erreur', description: e.message || 'Impossible de changer l\'étape', variant: 'destructive' });
+    }
+  };
 
   const handleStageFilterChange = (stage: string) => {
     setStageFilters(prev => 
@@ -432,6 +514,9 @@ export default function OpportunitiesPage() {
                     .catch(console.error);
                 }} />
               )}
+              <Button size="sm" variant="outline" className="h-8" asChild>
+                <Link href="/opportunities/completed">Voir Opportunités Terminées</Link>
+              </Button>
               </div>
           )}
         </CardHeader>
@@ -512,6 +597,7 @@ export default function OpportunitiesPage() {
                   <TableHead>Étape</TableHead>
                   <TableHead>Valeur</TableHead>
                   {(isManagerOrAdmin || isSales) && <TableHead>Score</TableHead>}
+                  <TableHead>Terminée</TableHead>
                   {isManagerOrAdmin && <TableHead>Propriétaire</TableHead>}
                   <TableHead>Date de création</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
@@ -546,6 +632,13 @@ export default function OpportunitiesPage() {
                           )}
                         </TableCell>
                       )}
+                      <TableCell>
+                        {['Gagnée','Clôturé','Perdue'].includes(opportunity.etape) ? (
+                          <Badge variant="outline" className="text-green-600 border-green-500">Oui</Badge>
+                        ) : (
+                          <span className="text-muted-foreground">Non</span>
+                        )}
+                      </TableCell>
                       {isManagerOrAdmin && <TableCell className="hidden md:table-cell">{employePersonneId ? getParticipantName(employePersonneId): opportunity.id_employe}</TableCell>}
                       <TableCell className="hidden md:table-cell">{new Date(opportunity.date_creation).toLocaleDateString()}</TableCell>
                       <TableCell className="text-right space-x-2">
@@ -595,164 +688,101 @@ export default function OpportunitiesPage() {
             <TabsContent value="timeline">
               {filteredOpportunities.length > 0 ? (
                 <div className="relative">
-                  {/* Timeline horizontale interactive - ligne avec points cliquables */}
-                  <div className="relative w-full mb-8 py-6 bg-muted/30 rounded-lg border-2 border-primary/20">
-                    {/* Ligne de timeline épaisse et colorée */}
-                    <div className="absolute top-10 left-4 right-4 h-3 bg-gradient-to-r from-blue-500 via-purple-500 to-green-500 rounded-full shadow-lg border-2 border-white"></div>
-                    
-                    {/* Points interactifs pour chaque statut - ordonnés selon l'enchaînement */}
-                    <div className="relative flex justify-between items-start" style={{ height: '120px' }}>
-                      {/* Statuts principaux dans l'ordre chronologique */}
-                      {['Prospection', 'Qualification', 'Proposition', 'Négociation', 'Gagnée'].map((stage, index) => {
-                        const stageOpps = filteredOpportunities.filter((o: any) => o.etape === stage);
-                        const percentage = (index / 4) * 100;
-                        const isSelected = selectedStage === stage;
-                        
-                        return (
-                          <div 
-                            key={stage} 
-                            className="absolute flex flex-col items-center z-30 transition-all"
-                            style={{ left: `calc(4px + ${percentage}% * (100% - 8px) / 100)`, transform: 'translateX(-50%)', top: '5px' }}
-                          >
-                            {/* Point cliquable sur la timeline */}
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                setSelectedStage(isSelected ? null : stage);
-                              }}
-                              className={`w-10 h-10 rounded-full border-4 border-white shadow-xl z-30 flex items-center justify-center transition-all hover:scale-125 active:scale-95 cursor-pointer ${
-                                isSelected 
-                                  ? 'bg-primary scale-125 ring-4 ring-primary/50 animate-pulse' 
-                                  : stageOpps.length > 0 
-                                    ? 'bg-primary scale-110 ring-2 ring-primary/50 hover:ring-4' 
-                                    : 'bg-muted scale-100 hover:bg-primary/50'
-                              }`}
-                              style={{ marginTop: '-2px' }}
-                              aria-label={`Voir les opportunités ${stage}`}
-                            >
-                              {stageOpps.length > 0 && (
-                                <span className="text-white text-xs font-bold">{stageOpps.length}</span>
-                              )}
-                            </button>
-                            {/* Étiquette de l'étape cliquable */}
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                setSelectedStage(isSelected ? null : stage);
-                              }}
-                              className={`mt-4 text-center min-w-[130px] px-3 py-2 rounded-md shadow-sm transition-all cursor-pointer ${
-                                isSelected 
-                                  ? 'bg-primary text-white scale-110 ring-2 ring-primary' 
-                                  : 'bg-white/90 backdrop-blur-sm hover:bg-white hover:shadow-md'
-                              }`}
-                            >
-                              <p className={`text-sm font-bold whitespace-nowrap ${
-                                isSelected ? 'text-white' : 'text-foreground'
-                              }`}>
-                                {stage}
-                              </p>
-                              <Badge 
-                                variant={isSelected ? 'secondary' : (stageVariant[stage] || 'secondary')} 
-                                className="mt-1 text-xs"
+                  {/* Nouvelle timeline: histogramme mensuel empilé par statut */}
+                  <div className="w-full mb-4">
+                    {/* Stepper des statuts */}
+                    <div className="p-4 bg-muted/30 rounded-lg border mb-3">
+                      <div className="relative flex items-center justify-between">
+                        {/* Ligne */}
+                        <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-[3px] bg-muted rounded" />
+                        {STEP_ORDER.map((stage, idx) => {
+                          const isActive = selectedStage === stage;
+                          return (
+                            <div key={stage} className="relative z-10 flex flex-col items-center">
+                              <button
+                                type="button"
+                                onClick={() => setSelectedStage(prev => prev === stage ? null : stage)}
+                                className={`w-10 h-10 rounded-full border flex items-center justify-center text-[11px] font-semibold transition ${
+                                  isActive ? 'bg-primary text-white border-primary shadow' : 'bg-background hover:bg-muted border-muted-foreground/30'
+                                }`}
+                                title={`${stage}`}
+                                aria-label={`Filtrer par ${stage}`}
                               >
-                                {stageOpps.length} opp.
-                              </Badge>
-                            </button>
-                          </div>
-                        );
-                      })}
-                      
-                      {/* Points pour les états finaux (à droite de la ligne) */}
-                      {['Perdue', 'Clôturé', 'Arrêtée'].map((stage, index) => {
-                        const stageOpps = filteredOpportunities.filter((o: any) => o.etape === stage);
-                        if (stageOpps.length === 0) return null;
-                        const isSelected = selectedStage === stage;
-                        
-                        return (
-                          <div 
-                            key={stage} 
-                            className="absolute flex flex-col items-end z-30 transition-all"
-                            style={{ right: '4px', top: `${index * 40 + 5}px` }}
-                          >
+                                {idx + 1}
+                              </button>
+                              <span className="mt-1 text-[10px] text-muted-foreground whitespace-nowrap">{stage}</span>
+                            </div>
+                          );
+                        })}
+                        {/* États finaux à droite */}
+                        <div className="relative z-10 flex items-center gap-2 ml-4">
+                          {FINAL_STAGES.map(end => (
                             <button
+                              key={end}
                               type="button"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                setSelectedStage(isSelected ? null : stage);
-                              }}
-                              className={`w-10 h-10 rounded-full border-4 border-white shadow-xl z-30 flex items-center justify-center transition-all hover:scale-125 active:scale-95 ring-2 cursor-pointer ${
-                                isSelected 
-                                  ? 'bg-red-500 scale-125 ring-4 ring-red-500/50 animate-pulse' 
-                                  : stageVariant[stage] === 'destructive' 
-                                    ? 'bg-red-500 ring-red-500/50 hover:ring-4' 
-                                    : 'bg-gray-500 ring-gray-500/50 hover:ring-4'
-                              }`}
-                              aria-label={`Voir les opportunités ${stage}`}
+                              onClick={() => setSelectedStage(prev => prev === end ? null : end)}
+                              className={`px-2 py-1 rounded-md text-xs border transition ${selectedStage === end ? 'bg-red-500 text-white border-red-500' : 'bg-white hover:bg-muted border-muted-foreground/20'}`}
+                              title={end}
+                              aria-label={`Filtrer par ${end}`}
                             >
-                              <span className="text-white text-xs font-bold">{stageOpps.length}</span>
+                              {end}
                             </button>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                setSelectedStage(isSelected ? null : stage);
-                              }}
-                              className={`mt-3 text-right min-w-[130px] px-3 py-2 rounded-md shadow-sm transition-all cursor-pointer ${
-                                isSelected 
-                                  ? 'bg-red-500 text-white scale-110 ring-2 ring-red-500' 
-                                  : 'bg-white/90 backdrop-blur-sm hover:bg-white hover:shadow-md'
-                              }`}
-                            >
-                              <p className={`text-sm font-bold whitespace-nowrap ${
-                                isSelected ? 'text-white' : 'text-foreground'
-                              }`}>
-                                {stage}
-                              </p>
-                              <Badge 
-                                variant={isSelected ? 'secondary' : (stageVariant[stage] || 'secondary')} 
-                                className="mt-1 text-xs"
-                              >
-                                {stageOpps.length} opp.
-                              </Badge>
-                            </button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                    
-                    {/* Bouton pour réinitialiser le filtre */}
-                    {selectedStage && (
-                      <div className="absolute bottom-2 right-2">
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          onClick={() => setSelectedStage(null)}
-                          className="bg-white/90 backdrop-blur-sm"
-                        >
-                          Voir toutes les opportunités
-                        </Button>
+                          ))}
+                        </div>
                       </div>
+                      <div className="flex justify-end mt-3">
+                        {selectedMonth || selectedStage ? (
+                          <Button variant="outline" size="sm" onClick={() => { setSelectedMonth(null); setSelectedStage(null); }}>Réinitialiser</Button>
+                        ) : null}
+                      </div>
+                    </div>
+                    <div className="p-4 bg-muted/30 rounded-lg border">
+                      <div className="relative flex items-center justify-between">
+                        {/* Ligne */}
+                        <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-[3px] bg-muted rounded" />
+                        {/* Points mois */}
+                        {monthKeys.map((key, idx) => {
+                          const isActive = selectedMonth === key;
+                          const counts = monthlyBuckets[key] || {};
+                          const total = Object.values(counts).reduce((a: any, b: any) => a + b, 0);
+                          return (
+                            <div key={key} className="relative z-10 flex flex-col items-center">
+                              <button
+                                type="button"
+                                onClick={() => setSelectedMonth(prev => prev === key ? null : key)}
+                                className={`w-9 h-9 rounded-full border flex items-center justify-center text-xs font-semibold transition ${
+                                  isActive ? 'bg-primary text-white border-primary shadow' : 'bg-background hover:bg-muted border-muted-foreground/30'
+                                }`}
+                                title={`Mois ${key.slice(5)} • ${total} opp.`}
+                                aria-label={`Filtrer mois ${key}`}
+                              >
+                                {key.slice(5)}
+                              </button>
+                              <span className="mt-1 text-[10px] text-muted-foreground">{String(idx + 1).padStart(2, '0')}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    {selectedMonth && (
+                      <p className="text-xs text-muted-foreground mt-2">Mois sélectionné: {selectedMonth}</p>
                     )}
                   </div>
 
-                  {/* Opportunités filtrées selon le point sélectionné */}
+                  {/* Opportunités filtrées selon le mois/les statuts */}
                   <div className="space-y-3 mt-4">
-                    {selectedStage ? (
+                    {selectedStage || selectedMonth ? (
                       <div className="mb-4 p-3 bg-primary/10 border border-primary/20 rounded-lg">
                         <p className="text-sm font-semibold text-primary">
-                          {timelineFilteredOpportunities.length} opportunité(s) au statut "{selectedStage}"
+                          {timelineFilteredOpportunities.length} opportunité(s)
+                          {selectedStage ? <> au statut "{selectedStage}"</> : null}
+                          {selectedMonth ? <> pour le mois {selectedMonth}</> : null}
                         </p>
                       </div>
                     ) : (
                       <div className="mb-4 p-3 bg-muted/50 border border-muted rounded-lg">
                         <p className="text-sm font-medium text-muted-foreground">
-                          👆 Cliquez sur un point de la timeline ci-dessus pour voir les opportunités d'un statut spécifique
+                          👆 Sélectionnez un ou plusieurs filtres (statut ou mois) pour affiner les opportunités
                         </p>
                       </div>
                     )}
@@ -796,8 +826,8 @@ export default function OpportunitiesPage() {
                                     {new Date(opp.date_creation).toLocaleDateString()}
                                   </div>
                                 </div>
-                                {/* Barre de progression */}
-                                <div className="mt-2">
+                                {/* Stepper de progression */}
+                                <div className="mt-2 space-y-2">
                                   {!isFinalState && stageIndex >= 0 ? (
                                     <Progress value={((stageIndex + 1) / 5) * 100} className="h-2" />
                                   ) : isFinalState ? (
@@ -805,6 +835,36 @@ export default function OpportunitiesPage() {
                                       <div className="h-full bg-red-500 rounded-full" style={{ width: '100%' }}></div>
                                     </div>
                                   ) : null}
+
+                                  {/* Stepper interactif */}
+                                  {!isFinalState && (
+                                    <div className="flex items-center gap-3">
+                                      {STEP_ORDER.map((stage, idx) => {
+                                        const completed = idx < stageIndex;
+                                        const current = idx === stageIndex;
+                                        const canClick = isManagerOrAdmin || idx === stageIndex + 1 || current; // admin/manager: jump; sales: only next/current
+                                        return (
+                                          <div key={stage} className="flex items-center gap-3">
+                                            <button
+                                              type="button"
+                                              onClick={() => canClick && !current && handleSetStage(opp as any, stage)}
+                                              disabled={!canClick || current}
+                                              className={`w-8 h-8 rounded-full text-xs font-bold border flex items-center justify-center transition ${
+                                                current ? 'bg-primary text-white border-primary' : completed ? 'bg-green-500 text-white border-green-600' : canClick ? 'bg-white hover:bg-muted border-muted-foreground/30' : 'bg-muted text-muted-foreground border-muted'
+                                              }`}
+                                              aria-label={`Aller à ${stage}`}
+                                              title={stage}
+                                            >
+                                              {idx + 1}
+                                            </button>
+                                            {idx < STEP_ORDER.length - 1 && (
+                                              <div className={`w-10 h-[2px] ${idx < stageIndex ? 'bg-green-500' : 'bg-muted'} rounded`} />
+                                            )}
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  )}
                                 </div>
                               </div>
                             </div>

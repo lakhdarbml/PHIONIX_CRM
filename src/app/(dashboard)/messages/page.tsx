@@ -779,11 +779,27 @@ export default function MessagesPage() {
         console.log("Selected contact", employee);
     };
     
-    const handleGenerateInteractions = () => {
-        toast({
-            title: "Analyse en cours",
-            description: "L'IA analyse les messages pour générer des interactions pertinentes. Cela peut prendre un moment.",
-        });
+    const handleGenerateInteractions = async () => {
+        if (!selectedConversationId) {
+            toast({ title: 'Aucune conversation', description: 'Veuillez sélectionner une conversation.', variant: 'destructive' });
+            return;
+        }
+        try {
+            toast({ title: 'Analyse en cours', description: "L'IA analyse les messages pour générer des interactions pertinentes." });
+            const res = await fetch(`/api/conversation/${selectedConversationId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'generate_interactions' }),
+            });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({} as any));
+                throw new Error(err?.error || 'Échec de la génération');
+            }
+            toast({ title: 'Terminé', description: 'Les interactions ont été générées.' });
+        } catch (e: any) {
+            console.error(e);
+            toast({ title: 'Erreur', description: e.message || 'Échec de la génération', variant: 'destructive' });
+        }
     };
 
     let typingTimeout: NodeJS.Timeout;

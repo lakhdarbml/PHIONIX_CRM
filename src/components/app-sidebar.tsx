@@ -27,7 +27,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth, type User as AuthUser } from "@/context/auth-context";
 import React from "react";
-import { PhoenixIcon } from "./icons";
+import Image from "next/image";
 
 type NavItem = {
   href: string;
@@ -128,10 +128,10 @@ export function AppSidebar() {
     <Sidebar>
       <SidebarHeader>
         <div className="flex items-center gap-3 px-2 py-1">
-            <PhoenixIcon className="w-7 h-7 text-primary" />
-            <div className="flex flex-col">
-              <span className="text-base font-semibold leading-tight font-headline">PhionixCRM</span>
-              <span className="text-xs text-muted-foreground">Organisez vos ventes et interactions</span>
+            <Image src="/logo.svg" alt="Phionix" width={28} height={28} />
+            <div className="flex flex-col leading-tight">
+              <span className="text-lg font-semibold font-headline">Phionix</span>
+              <span className="text-xs text-muted-foreground">Organisez vos ventes</span>
             </div>
         </div>
       </SidebarHeader>

@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/mysql';
 import emitNotification from '@/lib/notify';
+import { getLastUpdateTime } from '@/lib/interaction-timestamps';
+import type { Message } from '@/types/messages';
 
 export async function POST(request: Request) {
   const body = await request.json();
@@ -45,7 +47,22 @@ export async function POST(request: Request) {
 
 export async function PUT(request: Request) {
   const body = await request.json();
-  const { id_interaction, id_employe, id_client, id_type, resultat, date_interaction } = body;
+  const { id_interaction, id_employe, id_client, id_type, resultat, date_interaction, messages = false } = body;
+  
+  // If messages is true, fetch messages since last update
+  if (messages && id_interaction) {
+    const lastUpdate = getLastUpdateTime(String(id_interaction));
+    const messagesQuery = lastUpdate 
+      ? 'SELECT * FROM message WHERE id_interaction = ? AND date_envoi > ? ORDER BY date_envoi ASC'
+      : 'SELECT * FROM message WHERE id_interaction = ? ORDER BY date_envoi ASC';
+
+    const messages = await query(
+      messagesQuery,
+      lastUpdate ? [id_interaction, lastUpdate.lastUpdate] : [id_interaction]
+    ) as Message[];
+
+    return NextResponse.json({ messages });
+  }
   if (!id_interaction) return NextResponse.json({ error: 'id_interaction required' }, { status: 400 });
 
   await query('UPDATE Interaction SET id_employe = ?, id_client = ?, id_type = ?, resultat = ?, date_interaction = ? WHERE id_interaction = ?', [id_employe || null, id_client || null, id_type || null, resultat || null, date_interaction || null, id_interaction]);

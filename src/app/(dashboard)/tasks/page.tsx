@@ -19,6 +19,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
 import { FilePlus2, ListFilter, AlertTriangle, CheckCircle2, Circle, Hourglass, Inbox, Briefcase, User } from "lucide-react";
 import {
   DropdownMenu,
@@ -47,6 +48,7 @@ type Task = {
     id_createur: string;
     id_assigner_a: string;
     id_client?: string | null;
+  progress?: number;
     updated_at?: string;
 };
 
@@ -139,6 +141,14 @@ export default function TasksPage() {
     
     // Pour les autres rôles (sales, support, etc.)
     return tasks.filter(task => {
+      // Exclure les tâches en attente de validation pour les utilisateurs non-admin/non-manager,
+      // sauf si l'utilisateur est le créateur ou l'assigné de la tâche.
+      if (task.statut === 'PendingValidation') {
+        if (String(task.id_createur) === String(employe.id_employe)) return true;
+        if (String(task.id_assigner_a) === String(employe.id_employe)) return true;
+        return false;
+      }
+
       // Tâches professionnelles : l'employé doit être assigné
       if (task.id_client) {
         return String(task.id_assigner_a) === String(employe.id_employe);
@@ -183,6 +193,23 @@ export default function TasksPage() {
       }
     } catch (error) {
       console.error('Failed to refresh tasks:', error);
+    }
+  };
+
+  const handleUpdateProgress = async (taskId: string | number, newProgress: number) => {
+    try {
+      const res = await fetch('/api/task', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id_task: taskId, progress: newProgress, user_id: user?.personneId }),
+      });
+      if (!res.ok) throw new Error('Failed to update progress');
+      const updated = await res.json();
+      // Update local tasksData
+      setTasksData(prev => (prev || []).map((t: any) => String(t.id_task) === String(taskId) ? updated : t));
+    } catch (err) {
+      console.error('Failed to update progress', err);
+      toast({ title: 'Erreur', description: 'Impossible de mettre à jour la progression', variant: 'destructive' });
     }
   };
   
@@ -232,8 +259,11 @@ export default function TasksPage() {
                     {!isPersonal && <TableHead>Client</TableHead>}
                     <TableHead>Statut</TableHead>
                     <TableHead>Priorité</TableHead>
-                    {(isAdmin || isManager) && !isPersonal && <TableHead>Assigné à</TableHead>}
-                    <TableHead>Date d'échéance</TableHead>
+                    <TableHead>Progression</TableHead>
+                  <TableHead>Terminée</TableHead>
+                    {(isAdmin || isManager) && <TableHead>Assigné à</TableHead>}
+          <TableHead>Date d'échéance</TableHead>
+          <TableHead>Actions</TableHead>
                 </TableRow>
             </TableHeader>
             <TableBody>
@@ -256,8 +286,83 @@ export default function TasksPage() {
                                     {task.priorite}
                                 </Badge>
                             </TableCell>
-                            {(isAdmin || isManager) && !isPersonal && <TableCell>{getAssigneeName(task.id_assigner_a)}</TableCell>}
+                            <TableCell className="w-60">
+                              <div className="flex flex-col gap-2">
+                                <div className="flex items-center gap-2">
+                                  <div className="flex-1 relative">
+                                    <Progress value={typeof task.progress === 'number' ? task.progress : 0} className="h-3" />
+                                    <div className="absolute inset-0 flex items-center justify-center">
+                                      <span className="text-xs font-medium text-muted-foreground">{task.statut}</span>
+                                    </div>
+                                  </div>
+                                </div>
+                                {/* Status buttons for assignee or admins/managers */}
+                                {((isAdmin || isManager) || (() => {
+                                    const emp = (employes || []).find(e => String(e.id_personne) === String(user?.personneId));
+                                    return emp && String(emp.id_employe) === String(task.id_assigner_a);
+                                  })()) && (
+                                  <div className="flex gap-1">
+                                    {[
+                                      { label: "Ouverte", value: 0 },
+                                      { label: "En Cours", value: 50 },
+                                      { label: "Terminée", value: 100 }
+                                    ].map(({ label, value }) => (
+                                      <Button 
+                                        key={label} 
+                                        size="sm" 
+                                        variant={task.statut === label ? "default" : "outline"}
+                                        className="flex-1 h-8 text-xs"
+                                        onClick={() => {
+                                          if (task.statut === label) return;
+                                          if (task.statut === "Terminée") return;
+                                          handleUpdateProgress(task.id_task, value);
+                                        }}
+                                      >
+                                        {label}
+                                      </Button>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              {['Terminée','Annulée'].includes(task.statut) ? (
+                                <Badge variant="outline" className="text-green-600 border-green-500">Oui</Badge>
+                              ) : (
+                                <span className="text-muted-foreground">Non</span>
+                              )}
+                            </TableCell>
+                            {(isAdmin || isManager) && <TableCell>{getAssigneeName(task.id_assigner_a)}</TableCell>}
                             <TableCell>{task.date_echeance ? new Date(task.date_echeance).toLocaleDateString() : 'N/A'}</TableCell>
+                            <TableCell className="text-right">
+                              {/* Next step button: visible to admins/managers or to assignee */}
+                              {(() => {
+                                const emp = (employes || []).find(e => String(e.id_personne) === String(user?.personneId));
+                                const isAssignee = emp && String(emp.id_employe) === String(task.id_assigner_a);
+                                if (isAdmin || isManager || isAssignee) {
+                                  const isFinal = ['Terminée','Annulée'].includes(task.statut);
+                                  return (
+                                    <Button size="sm" variant="outline" disabled={isFinal} onClick={async () => {
+                                      try {
+                                        const res = await fetch('/api/task', {
+                                          method: 'PUT',
+                                          headers: { 'Content-Type': 'application/json' },
+                                          body: JSON.stringify({ id_task: task.id_task, action: 'advance', user_id: user?.personneId })
+                                        });
+                                        if (!res.ok) throw new Error('Failed to advance status');
+                                        const updated = await res.json();
+                                        setTasksData(prev => (prev || []).map((t: any) => String(t.id_task) === String(task.id_task) ? updated : t));
+                                        toast({ title: 'Statut mis à jour', description: `Nouvel statut: ${updated.statut}` });
+                                      } catch (err) {
+                                        console.error('Failed to advance status', err);
+                                        toast({ title: 'Erreur', description: 'Impossible d\'avancer le statut', variant: 'destructive' });
+                                      }
+                                    }}>Suivant</Button>
+                                  );
+                                }
+                                return null;
+                              })()}
+                            </TableCell>
                         </TableRow>
                     )
                 })}
@@ -322,6 +427,10 @@ export default function TasksPage() {
               </Link>
             </Button>
           )}
+
+          <Button size="sm" variant="outline" className="h-8" asChild>
+            <Link href="/tasks/completed">Voir Tâches Terminées</Link>
+          </Button>
 
           {canAddTask && (
             <AddTaskDialog onTaskAdded={handleTaskAdded} />

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/mysql';
+import { generateFromOpportunity } from '@/lib/interaction-generator';
 
 export async function POST(request: Request) {
   try {
@@ -45,7 +46,7 @@ export async function POST(request: Request) {
       'SELECT * FROM opportunite WHERE id_opportunite = ?',
       [result.insertId]
     );
-
+    try { await generateFromOpportunity(result.insertId, 'create'); } catch (e) { console.error('Failed to generate interaction from opportunity create', e); }
     return NextResponse.json(created || null);
   } catch (error: any) {
     console.error('Erreur création opportunité:', error);
@@ -55,5 +56,7 @@ export async function POST(request: Request) {
     );
   }
 }
+
+
 
 

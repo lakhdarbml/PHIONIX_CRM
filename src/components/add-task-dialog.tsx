@@ -53,6 +53,9 @@ export function AddTaskDialog({ onTaskAdded }: AddTaskDialogProps) {
       if (employeesRes.ok) {
         const employeesData = await employeesRes.json();
         setEmployees(employeesData);
+        // Prefill assigner with the current user's employe id if available
+        const emp = employeesData.find((e: any) => String(e.id_personne) === String(user?.personneId));
+        if (emp) setFormData(fd => ({ ...fd, id_assigner_a: String(emp.id_employe) }));
       }
 
       if (clientsRes.ok) {
@@ -74,7 +77,7 @@ export function AddTaskDialog({ onTaskAdded }: AddTaskDialogProps) {
     let err = {
       titre: !formData.titre.trim(),
       description: !formData.description.trim(),
-      id_assigner_a: !formData.id_assigner_a,
+      id_assigner_a: (!isPersonal && !formData.id_assigner_a) ? true : false,
       date_echeance: !formData.date_echeance,
       id_client: (!isPersonal && !formData.id_client) ? true : false
     };
@@ -85,15 +88,34 @@ export function AddTaskDialog({ onTaskAdded }: AddTaskDialogProps) {
     }
     setLoading(true);
     try {
+      // determine current employee (creator)
+      const emp = employees.find((e: any) => String(e.id_personne) === String(user?.personneId));
+      const id_createur = emp ? emp.id_employe : undefined;
+
+      const payload: any = {
+        titre: formData.titre,
+        description: formData.description,
+        priorite: formData.priorite,
+        date_echeance: formData.date_echeance || null,
+        id_createur: id_createur,
+      };
+
+      if (isPersonal) {
+        // personal tasks are assigned to creator and do not require validation
+        payload.id_assigner_a = id_createur;
+        payload.statut = 'Ouverte';
+        payload.id_client = null;
+      } else {
+        payload.id_assigner_a = formData.id_assigner_a;
+        payload.id_client = formData.id_client || null;
+        // professional tasks require admin validation unless creator is admin
+        payload.statut = user?.role === 'admin' ? 'Ouverte' : 'PendingValidation';
+      }
+
       const response = await fetch('/api/task', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...formData,
-          valide: user?.role === 'admin',
-          status: user?.role === 'admin' ? 'Ouverte' : 'PendingValidation',
-          date_creation: new Date().toISOString(),
-        })
+        body: JSON.stringify(payload)
       });
       if (!response.ok) {
         const errMsg = await response.json().catch(()=>({error:'Erreur serveur'}));
@@ -103,7 +125,7 @@ export function AddTaskDialog({ onTaskAdded }: AddTaskDialogProps) {
       onTaskAdded();
       setOpen(false);
       setErrors(initialErrors);
-      setFormData({ titre:'', description:'', type:'Professionnel', priorite:'Moyenne', date_echeance:'', id_client:'', id_assigner_a:'' });
+  setFormData({ titre:'', description:'', type:'Professionnel', priorite:'Moyenne', date_echeance:'', id_client:'', id_assigner_a: String(emp?.id_employe || '') });
     } catch (error:any) {
       toast({ title:'Erreur', description: error?.message||'Création impossible', variant:'destructive'});
     } finally {
@@ -218,25 +240,29 @@ export function AddTaskDialog({ onTaskAdded }: AddTaskDialogProps) {
             </div>
           )}
 
-          <div className="space-y-2">
-            <Label htmlFor="assignee">Assigné à</Label>
-            <Select 
-              value={formData.id_assigner_a} 
-              onValueChange={(value) => handleChange('id_assigner_a', value)}
-              required
-            >
-              <SelectTrigger className={errors.id_assigner_a?"border-red-500 focus-visible:ring-red-500":""}>
-                <SelectValue placeholder="Sélectionner un employé" />
-              </SelectTrigger>
-              <SelectContent>
-                {employees.map((employee) => (
-                  <SelectItem key={employee.id_employe} value={employee.id_employe}>
-                    {`${employee.nom} ${employee.prenom}`}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {!isPersonal ? (
+            <div className="space-y-2">
+              <Label htmlFor="assignee">Assigné à</Label>
+              <Select 
+                value={formData.id_assigner_a} 
+                onValueChange={(value) => handleChange('id_assigner_a', value)}
+                required
+              >
+                <SelectTrigger className={errors.id_assigner_a?"border-red-500 focus-visible:ring-red-500":""}>
+                  <SelectValue placeholder="Sélectionner un employé" />
+                </SelectTrigger>
+                <SelectContent>
+                  {employees.map((employee) => (
+                    <SelectItem key={employee.id_employe} value={employee.id_employe}>
+                      {`${employee.nom} ${employee.prenom}`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : (
+            <div className="text-sm text-muted-foreground">La tâche personnelle sera automatiquement assignée à vous.</div>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="date_echeance">Date d'échéance</Label>

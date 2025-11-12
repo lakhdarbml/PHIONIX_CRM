@@ -32,6 +32,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from '@/context/auth-context';
 import { useEffect } from 'react';
+import { useToast } from '@/hooks/use-toast';
 
 // Local types
 type Interaction = {
@@ -72,6 +73,7 @@ const typeIcon: { [key: string]: React.ElementType } = {
 function InteractionsPageContent() {
   const router = useRouter();
   const { user } = useAuth();
+  const { toast } = useToast();
   const [typeFilters, setTypeFilters] = useState<string[]>(ALL_TYPES);
 
   const [interactions, setInteractions] = React.useState<Interaction[]>([]);
@@ -85,8 +87,7 @@ function InteractionsPageContent() {
     return personne ? `${personne.prenom} ${personne.nom}` : String(personneId);
   }
 
-  useEffect(() => {
-    const load = async () => {
+  const load = React.useCallback(async () => {
       try {
         const [typesRes, interactionsRes, personnesRes, clientsRes, employesRes] = await Promise.all([
           fetch('/api/data/Type_Interaction'),
@@ -104,10 +105,9 @@ function InteractionsPageContent() {
       } catch (err) {
         console.error('Failed to load interactions data', err);
       }
-    };
+    }, []);
 
-    load();
-  }, []);
+  useEffect(() => { load(); }, [load]);
 
   const visibleInteractions = React.useMemo(() => {
     if (!user) return [];
@@ -131,8 +131,8 @@ function InteractionsPageContent() {
       return visibleInteractions;
     }
     return visibleInteractions.filter(interaction => {
-      const typeLabel = typesMap.get(String(interaction.id_type));
-      return typeLabel && typeFilters.includes(typeLabel);
+      const typeLabel = typesMap.get(String(interaction.id_type)) || 'Note';
+      return typeFilters.includes(typeLabel);
     });
   }, [visibleInteractions, typeFilters, types]);
 
@@ -148,6 +148,29 @@ function InteractionsPageContent() {
 
   const canAddInteraction = user?.role === 'sales' || user?.role === 'support';
   const canGenerateInteractions = user?.role === 'admin' || user?.role === 'manager';
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  const handleGenerateAll = async () => {
+    if (!canGenerateInteractions) return;
+    setIsGenerating(true);
+    try {
+      const convRes = await fetch('/api/data/Conversation');
+      const conversations = convRes.ok ? await convRes.json() : [];
+      const ids = Array.isArray(conversations) ? conversations.map((c: any) => c.id_conversation) : [];
+      await Promise.all(ids.map((id: any) => fetch(`/api/conversation/${id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'generate_interactions', lastMinutes: 24 * 60 })
+      })));
+      toast({ title: 'Interactions générées', description: `Traitement de ${ids.length} conversation(s)` });
+      await load();
+    } catch (e) {
+      console.error('Generate interactions failed', e);
+      toast({ title: 'Échec de génération', description: 'Veuillez réessayer plus tard', variant: 'destructive' });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
 
   const clientsMap = React.useMemo(() => new Map((clients as Client[]).map(c => [String(c.id_client), c.id_personne])), [clients]);
   const employesMap = React.useMemo(() => new Map((employes as Employe[]).map(e => [String(e.id_employe), e.id_personne])), [employes]);
@@ -194,11 +217,9 @@ function InteractionsPageContent() {
             </Button>
           )}
           {canGenerateInteractions && (
-            <Button size="sm" className="h-8 gap-1">
+            <Button size="sm" className="h-8 gap-1" onClick={handleGenerateAll} disabled={isGenerating}>
                 <Sparkles className="h-3.5 w-3.5" />
-                 <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
-                    Générer les Interactions
-                </span>
+                 <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">{isGenerating ? 'Génération…' : 'Générer les Interactions'}</span>
              </Button>
           )}
           <Button size="sm" className="h-8 gap-1" asChild>
